@@ -93,7 +93,7 @@ export function Sidebar({
             Nuevo proyecto
           </button>
         )}
-        {activeProjectId && (
+        {isAdmin && activeProjectId && (
           <button className="sidebar-add-btn" onClick={onNewSubproject} style={{ marginTop: 2 }}>
             <span style={{ fontSize: 14 }}>↳</span>
             Subproyecto

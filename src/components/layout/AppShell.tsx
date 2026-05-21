@@ -1146,27 +1146,66 @@ export function AppShell() {
 
   /* ── Empty state ────────────────────────────────────────────── */
   if (projects.length === 0) {
+    const isAdmin = isPlatformAdmin(me);
     return (
       <>
         <div className="app-loading">
-          <div className="app-loading-icon">⚡</div>
-          <p style={{ color: "var(--text2)", marginBottom: 16 }}>No tienes proyectos aún.</p>
-          <button
-            onClick={handleNewProject}
-            style={{
-              background: "var(--brand)", color: "#fff", border: "none",
-              padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-            }}
-          >
-            + Crear primer proyecto
-          </button>
+          <div className="app-loading-icon">{isAdmin ? "⚡" : "🔒"}</div>
+          {isAdmin ? (
+            <>
+              <p style={{ color: "var(--text2)", marginBottom: 16 }}>
+                No tienes proyectos aún. Crea el primero.
+              </p>
+              <button
+                onClick={handleNewProject}
+                style={{
+                  background: "var(--brand)", color: "#fff", border: "none",
+                  padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+                }}
+              >
+                + Crear primer proyecto
+              </button>
+            </>
+          ) : (
+            <>
+              <p style={{ color: "var(--text)", fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
+                Esperando acceso
+              </p>
+              <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 13, maxWidth: 320, textAlign: "center" }}>
+                Tu cuenta está activa pero aún no tienes proyectos asignados.
+                Un administrador debe invitarte a un proyecto para que puedas trabajar.
+              </p>
+              <div style={{
+                background: "var(--surface2)", border: "1px solid var(--border)",
+                borderRadius: 10, padding: "12px 20px", fontSize: 12, color: "var(--text3)",
+                maxWidth: 320, textAlign: "center",
+              }}>
+                📧 Comparte tu email con el admin:<br />
+                <strong style={{ color: "var(--text2)", marginTop: 4, display: "block" }}>
+                  {me?.email}
+                </strong>
+              </div>
+              <button
+                onClick={handleLogout}
+                style={{
+                  marginTop: 24, background: "transparent", border: "1px solid var(--border)",
+                  color: "var(--text3)", padding: "6px 16px", borderRadius: 8,
+                  cursor: "pointer", fontSize: 12,
+                }}
+              >
+                ↩ Cerrar sesión
+              </button>
+            </>
+          )}
         </div>
-        <ProjectWizard
-          open={wizardOpen}
-          parentProjectId={wizardParentId}
-          onClose={() => setWizardOpen(false)}
-          onCreated={handleWizardCreated}
-        />
+        {isAdmin && (
+          <ProjectWizard
+            open={wizardOpen}
+            parentProjectId={wizardParentId}
+            onClose={() => setWizardOpen(false)}
+            onCreated={handleWizardCreated}
+          />
+        )}
       </>
     );
   }
