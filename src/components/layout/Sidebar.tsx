@@ -22,11 +22,12 @@ interface SidebarProps {
 }
 
 const BASE_VIEWS = [
-  { id: "canvas",  icon: "◈", label: "Embudo"     },
-  { id: "board",   icon: "▦", label: "Dashboard"  },
-  { id: "roles",   icon: "◎", label: "Roles"      },
-  { id: "docs",    icon: "⊟", label: "Docs"       },
-  { id: "tablero", icon: "▤", label: "Resumen"    },
+  { id: "canvas",   icon: "◈",  label: "Embudo"    },
+  { id: "board",    icon: "▦",  label: "Dashboard" },
+  { id: "roles",    icon: "◎",  label: "Roles"     },
+  { id: "docs",     icon: "⊟",  label: "Docs"      },
+  { id: "tablero",  icon: "▤",  label: "Resumen"   },
+  { id: "permisos", icon: "🔐", label: "Permisos"  },
 ];
 
 export function Sidebar({

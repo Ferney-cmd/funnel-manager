@@ -6,12 +6,13 @@ import { ROLE_LABELS, ROLE_COLORS } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
 
 interface RolesViewProps {
-  project: Project | undefined;
-  nodes:   Node<FunnelNodeData>[];
-  members: ProjectMember[];
+  project:      Project | undefined;
+  nodes:        Node<FunnelNodeData>[];
+  members:      ProjectMember[];
+  onSelectView: (view: string) => void;
 }
 
-export function RolesView({ project, nodes, members }: RolesViewProps) {
+export function RolesView({ project, nodes, members, onSelectView }: RolesViewProps) {
   if (!project) {
     return (
       <div className="view-placeholder">
@@ -42,6 +43,10 @@ export function RolesView({ project, nodes, members }: RolesViewProps) {
 
   return (
     <div className="roles-view">
+      <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
+        <span className="view-back-title">Roles · {project.name}</span>
+      </div>
       <div className="roles-header">
         <div className="roles-header-title">Roles · {project.name}</div>
         <div className="roles-header-sub">{nodes.length} módulos · {sections.length} roles activos</div>

@@ -13,8 +13,9 @@ import { Dashboard }     from "@/components/dashboard/Dashboard";
 import { RolesView }     from "@/components/views/RolesView";
 import { DocsView }      from "@/components/views/DocsView";
 import { BoardView }     from "@/components/views/BoardView";
-import { AdminView }     from "@/components/views/AdminView";
-import { ProjectWizard } from "@/components/project/ProjectWizard";
+import { AdminView }       from "@/components/views/AdminView";
+import { PermissionsView } from "@/components/views/PermissionsView";
+import { ProjectWizard }   from "@/components/project/ProjectWizard";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole } from "@/lib/types";
@@ -959,6 +960,7 @@ export function AppShell() {
       status:          data.status,
       progress:        0,
       blockedCount:    0,
+      ownerId:         data.user_id ?? null,
       parentProjectId: data.parent_project_id ?? null,
       startDate:       data.start_date ?? null,
       endDate:         data.end_date   ?? null,
@@ -1103,27 +1105,31 @@ export function AppShell() {
 
   /* ── Inject callbacks + members into funnel nodes ───────────── */
   const currentMembers = membersByProject[activeProjectId] ?? [];
-  const nodesWithCallbacks = useMemo<Node<FunnelNodeData>[]>(
-    () =>
-      currentNodes.map((n) => ({
-        ...n,
-        zIndex: 1,
-        data: {
-          ...n.data,
-          members: currentMembers,
+  const nodesWithCallbacks = useMemo<Node<FunnelNodeData>[]>(() => {
+    const activeProj = projects.find((p) => p.id === activeProjectId);
+    const myRole = getMyProjectRole(me?.id, activeProj, currentMembers);
+    const canEdit = myRole === "owner" || myRole === "editor";
+
+    return currentNodes.map((n) => ({
+      ...n,
+      zIndex: 1,
+      data: {
+        ...n.data,
+        members: currentMembers,
+        onMarkRead:    () => handleMarkRead(n.id),
+        onSendMessage: (text: string) => handleSendMessage(n.id, text),
+        onUploadFile:  (file: File)   => handleUploadFile(n.id, file),
+        ...(canEdit ? {
           onTaskToggle:     (taskId: string) => handleTaskToggle(n.id, taskId),
           onDeleteTask:     (taskId: string) => handleDeleteTask(n.id, taskId),
-          onMarkRead:       ()               => handleMarkRead(n.id),
-          onSendMessage:    (text: string)   => handleSendMessage(n.id, text),
           onAddTask:        (text: string, dueDate?: string | null, priority?: TaskPriority) => handleAddTask(n.id, text, dueDate ?? undefined, priority),
-          onUpdateTask:     (taskId: string, upd) => handleUpdateTask(n.id, taskId, upd),
-          onUpdateNodeData: (updates)        => handleUpdateNodeData(n.id, updates),
-          onUploadFile:     (file: File)     => handleUploadFile(n.id, file),
-        },
-      })),
+          onUpdateTask:     (taskId: string, upd: any) => handleUpdateTask(n.id, taskId, upd),
+          onUpdateNodeData: (updates: any)   => handleUpdateNodeData(n.id, updates),
+        } : {}),
+      },
+    }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentNodes, currentMembers]
-  );
+  }, [currentNodes, currentMembers, me?.id, projects, activeProjectId]);
 
   /* ── Inject callbacks into zones ────────────────────────────── */
   const zonesWithCallbacks = useMemo<Node<ZoneNodeData>[]>(
@@ -1256,15 +1262,15 @@ export function AppShell() {
         onOpenTeam={() => setTeamOpen(true)}
       />
 
-      {activeView === "canvas" && (
-        <FunnelCanvas
-          nodes={allNodes}
-          edges={currentEdges}
-          onNodesChange={handleNodesChange}
-          onEdgesChange={handleEdgesChange}
-          onConnect={handleConnect}
-        />
-      )}
+      {/* Always rendered to preserve layout */}
+      <FunnelCanvas
+        nodes={allNodes}
+        edges={currentEdges}
+        onNodesChange={handleNodesChange}
+        onEdgesChange={handleEdgesChange}
+        onConnect={handleConnect}
+        visible={activeView === "canvas"}
+      />
 
       {activeView === "board" && (
         <div className="view-scroll">
@@ -1291,25 +1297,44 @@ export function AppShell() {
             project={activeProject}
             nodes={currentNodes}
             members={currentMembers}
+            onSelectView={setActiveView}
           />
         </div>
       )}
 
       {activeView === "roles" && (
         <div className="view-scroll">
-          <RolesView project={activeProject} nodes={currentNodes} members={currentMembers} />
+          <RolesView project={activeProject} nodes={currentNodes} members={currentMembers} onSelectView={setActiveView} />
         </div>
       )}
 
       {activeView === "docs" && (
         <div className="view-scroll">
-          <DocsView project={activeProject} nodes={currentNodes} />
+          <DocsView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
         </div>
       )}
 
       {activeView === "admin" && isPlatformAdmin(me) && (
         <div className="view-scroll">
-          <AdminView me={me} />
+          <AdminView me={me} onSelectView={setActiveView} />
+        </div>
+      )}
+
+      {activeView === "permisos" && (
+        <div className="view-scroll">
+          <PermissionsView
+            project={activeProject}
+            members={currentMembers}
+            myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
+            onSelectView={setActiveView}
+            onMembersChange={() => {
+              setMembersByProject((prev) => {
+                const next = { ...prev };
+                delete next[activeProjectId];
+                return next;
+              });
+            }}
+          />
         </div>
       )}
 

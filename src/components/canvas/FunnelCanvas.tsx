@@ -36,14 +36,16 @@ interface FunnelCanvasProps {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect:     (connection: Connection) => void;
+  visible?:      boolean;
 }
 
 export function FunnelCanvas({
   nodes, edges,
   onNodesChange, onEdgesChange, onConnect,
+  visible = true,
 }: FunnelCanvasProps) {
   return (
-    <div className="canvas-area">
+    <div className="canvas-area" style={{ display: visible ? "flex" : "none" }}>
       <ReactFlow
         nodes={nodes}
         edges={edges}

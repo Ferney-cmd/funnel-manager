@@ -6,10 +6,11 @@ import { getAllProfiles, getInitials, isSuperAdmin, type Profile, type PlatformR
 import { PLATFORM_ROLE_LABELS } from "@/lib/constants";
 
 interface AdminViewProps {
-  me: Profile | null;
+  me:           Profile | null;
+  onSelectView: (view: string) => void;
 }
 
-export function AdminView({ me }: AdminViewProps) {
+export function AdminView({ me, onSelectView }: AdminViewProps) {
   const supabase = createClient();
   const [users, setUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,6 +48,10 @@ export function AdminView({ me }: AdminViewProps) {
 
   return (
     <div className="admin-view">
+      <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
+        <span className="view-back-title">Gestión de Usuarios</span>
+      </div>
       <div className="admin-header">
         <div className="admin-title">Gestión de Usuarios</div>
         <div className="admin-subtitle">

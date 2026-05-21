@@ -4,8 +4,9 @@ import type { Node } from "reactflow";
 import type { FunnelNodeData, Project } from "@/lib/types";
 
 interface DocsViewProps {
-  project: Project | undefined;
-  nodes:   Node<FunnelNodeData>[];
+  project:      Project | undefined;
+  nodes:        Node<FunnelNodeData>[];
+  onSelectView: (view: string) => void;
 }
 
 function fmtDate(iso: string) {
@@ -42,7 +43,7 @@ function FileCard({ url, type, name, author, date }: {
   );
 }
 
-export function DocsView({ project, nodes }: DocsViewProps) {
+export function DocsView({ project, nodes, onSelectView }: DocsViewProps) {
   if (!project) {
     return (
       <div className="view-placeholder">
@@ -66,6 +67,10 @@ export function DocsView({ project, nodes }: DocsViewProps) {
 
   return (
     <div className="docs-view">
+      <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
+        <span className="view-back-title">Archivos · {project.name}</span>
+      </div>
       <div className="docs-header">
         <div className="docs-header-title">Archivos · {project.name}</div>
         <div className="docs-header-sub">{totalFiles} archivo{totalFiles !== 1 ? "s" : ""} en {sections.length} módulo{sections.length !== 1 ? "s" : ""}</div>

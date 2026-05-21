@@ -6,12 +6,13 @@ import { ROLE_LABELS, ROLE_COLORS } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
 
 interface DashboardProps {
-  project:  Project | undefined;
-  nodes:    Node<FunnelNodeData>[];
-  members:  ProjectMember[];
+  project:      Project | undefined;
+  nodes:        Node<FunnelNodeData>[];
+  members:      ProjectMember[];
+  onSelectView: (view: string) => void;
 }
 
-export function Dashboard({ project, nodes, members }: DashboardProps) {
+export function Dashboard({ project, nodes, members, onSelectView }: DashboardProps) {
   if (!project) {
     return (
       <div className="dash-empty">
@@ -79,6 +80,10 @@ export function Dashboard({ project, nodes, members }: DashboardProps) {
 
   return (
     <div className="dashboard">
+      <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
+        <span className="view-back-title">Resumen · {project.name}</span>
+      </div>
       {/* ── Header ── */}
       <div className="dash-hero">
         <div>
