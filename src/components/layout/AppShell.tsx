@@ -1324,16 +1324,9 @@ export function AppShell() {
         <div className="view-scroll">
           <PermissionsView
             project={activeProject}
-            members={currentMembers}
+            projectId={activeProjectId}
             myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
             onSelectView={setActiveView}
-            onMembersChange={() => {
-              setMembersByProject((prev) => {
-                const next = { ...prev };
-                delete next[activeProjectId];
-                return next;
-              });
-            }}
           />
         </div>
       )}
