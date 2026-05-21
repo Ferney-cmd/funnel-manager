@@ -17,11 +17,23 @@ import { AdminView }     from "@/components/views/AdminView";
 import { ProjectWizard } from "@/components/project/ProjectWizard";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
-import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority } from "@/lib/types";
+import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/constants";
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+}
+
+function getMyProjectRole(
+  meId: string | undefined,
+  project: Project | undefined,
+  members: ProjectMember[]
+): ProjectRole {
+  if (!meId || !project) return "viewer";
+  if (project.ownerId === meId) return "owner";
+  const m = members.find((mb) => mb.id === meId);
+  if (m?.role === "editor") return "editor";
+  return "viewer";
 }
 
 function computeProgress(nodes: Node<FunnelNodeData>[]): number {
@@ -80,6 +92,7 @@ export function AppShell() {
             status:          p.status,
             progress:        0,
             blockedCount:    0,
+            ownerId:         p.user_id ?? null,
             parentProjectId: p.parent_project_id ?? null,
             startDate:       p.start_date ?? null,
             endDate:         p.end_date   ?? null,
@@ -688,7 +701,7 @@ export function AppShell() {
   const handleUpdateTask = useCallback((
     nodeId: string,
     taskId: string,
-    updates: { text?: string; dueDate?: string | null; priority?: TaskPriority; assignedTo?: string | null }
+    updates: { text?: string; dueDate?: string | null; priority?: TaskPriority; assignedTo?: string | null; description?: string }
   ) => {
     setNodesMap((prev) => ({
       ...prev,
@@ -705,10 +718,11 @@ export function AppShell() {
       ),
     }));
     const db: Record<string, unknown> = {};
-    if (updates.text       !== undefined) db.text        = updates.text;
-    if (updates.dueDate    !== undefined) db.due_date    = updates.dueDate;
-    if (updates.priority   !== undefined) db.priority    = updates.priority;
-    if (updates.assignedTo !== undefined) db.assigned_to = updates.assignedTo;
+    if (updates.text        !== undefined) db.text        = updates.text;
+    if (updates.dueDate     !== undefined) db.due_date    = updates.dueDate;
+    if (updates.priority    !== undefined) db.priority    = updates.priority;
+    if (updates.assignedTo  !== undefined) db.assigned_to = updates.assignedTo;
+    if (updates.description !== undefined) db.description = updates.description;
     if (Object.keys(db).length)
       supabase.from("node_tasks").update(db).eq("id", taskId).then(() => {});
   }, [activeProjectId, supabase]);
@@ -1258,6 +1272,8 @@ export function AppShell() {
             project={activeProject}
             nodes={currentNodes}
             members={currentMembers}
+            me={me}
+            myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
             onAddTask={handleAddTask}
             onToggleTask={handleTaskToggle}
             onDeleteTask={handleDeleteTask}

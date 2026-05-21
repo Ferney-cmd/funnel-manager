@@ -51,6 +51,19 @@ export const PLATFORM_ROLE_LABELS = {
   user:        "Usuario",
 } as const;
 
+/* ── Project-level roles (3 levels) ─────────────────── */
+export const PROJECT_ROLE_LABELS: Record<string, string> = {
+  owner:  "Dueño del proyecto",
+  editor: "Project Manager",
+  viewer: "Colaborador",
+};
+
+export const PROJECT_ROLE_COLORS: Record<string, string> = {
+  owner:  "#7C3AED",
+  editor: "#10B981",
+  viewer: "#6B7280",
+};
+
 /* ── Task suggestions per role (auto-completar tareas comunes) ─ */
 export const TASK_SUGGESTIONS: Record<string, string[]> = {
   trafficker: [

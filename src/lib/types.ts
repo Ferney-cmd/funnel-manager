@@ -19,9 +19,24 @@ export interface Project {
   status: ProjectStatus;
   progress: number;
   blockedCount: number;
+  ownerId?: string;
   parentProjectId?: string | null;
   startDate?: string | null;
   endDate?:   string | null;
+}
+
+export type ProjectRole = "owner" | "editor" | "viewer";
+
+export interface TaskComment {
+  id:           string;
+  taskId:       string;
+  userId:       string;
+  userName:     string;
+  userInitials: string;
+  userColor:    string;
+  text:         string;
+  createdAt:    string;
+  isMe?:        boolean;
 }
 
 export interface NodeTask {
