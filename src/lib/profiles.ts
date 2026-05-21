@@ -1,10 +1,21 @@
 import { createClient } from "./supabase/client";
 
+export type PlatformRole = "super_admin" | "admin" | "user";
+
 export interface Profile {
-  id:        string;
-  full_name: string;
-  email:     string;
-  color:     string;
+  id:            string;
+  full_name:     string;
+  email:         string;
+  color:         string;
+  platform_role: PlatformRole;
+}
+
+export function isPlatformAdmin(p: Profile | null): boolean {
+  return p?.platform_role === "super_admin" || p?.platform_role === "admin";
+}
+
+export function isSuperAdmin(p: Profile | null): boolean {
+  return p?.platform_role === "super_admin";
 }
 
 const cache = new Map<string, Profile>();
@@ -26,7 +37,7 @@ export async function getCurrentProfile(): Promise<Profile | null> {
     if (!user) return null;
     const { data } = await supabase
       .from("profiles")
-      .select("id, full_name, email, color")
+      .select("id, full_name, email, color, platform_role")
       .eq("id", user.id)
       .single();
     if (!data) return null;
@@ -48,7 +59,7 @@ export async function getProfilesByIds(ids: string[]): Promise<Map<string, Profi
   const supabase = createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, email, color")
+    .select("id, full_name, email, color, platform_role")
     .in("id", missing);
 
   for (const p of (data || []) as Profile[]) {
@@ -62,7 +73,7 @@ export async function getAllProfiles(): Promise<Profile[]> {
   const supabase = createClient();
   const { data } = await supabase
     .from("profiles")
-    .select("id, full_name, email, color")
+    .select("id, full_name, email, color, platform_role")
     .order("full_name", { ascending: true });
   for (const p of (data || []) as Profile[]) cache.set(p.id, p);
   return (data || []) as Profile[];

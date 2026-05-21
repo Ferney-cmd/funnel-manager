@@ -2,9 +2,10 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Handle, Position, NodeProps } from "reactflow";
-import { ROLE_LABELS, TASK_SUGGESTIONS } from "@/lib/constants";
+import { ROLE_LABELS, TASK_SUGGESTIONS, ALERT_COLORS } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
 import type { FunnelNodeData, NodeTask, ChatMessage } from "@/lib/types";
+import { computeTaskAlertStatus } from "@/lib/types";
 
 const ROLE_COLOR_MAP: Record<string, string> = {
   trafficker:    "#3B82F6",
@@ -558,6 +559,10 @@ function TaskRow({ task, roleColor, onToggle, onDelete }: {
   task: NodeTask; roleColor: string; onToggle: () => void; onDelete: () => void;
 }) {
   const [hovered, setHovered] = useState(false);
+  const alert = computeTaskAlertStatus(task);
+  const showAlert = !task.done && task.dueDate && alert !== "no_date" && alert !== "on_track";
+  const ac = showAlert ? ALERT_COLORS[alert] : null;
+
   return (
     <div
       onMouseEnter={() => setHovered(true)}
@@ -582,6 +587,15 @@ function TaskRow({ task, roleColor, onToggle, onDelete }: {
           textDecoration: task.done ? "line-through" : "none" }}>
         {task.text}
       </span>
+      {/* Alert badge */}
+      {showAlert && ac && (
+        <span
+          className={`task-alert-badge task-alert-${alert}`}
+          title={`Fecha límite: ${task.dueDate}`}
+          style={{ background: ac.bg, color: ac.fg, marginRight: hovered ? 18 : 0 }}>
+          {ac.label}
+        </span>
+      )}
       {/* Delete button — visible on hover */}
       {hovered && (
         <button

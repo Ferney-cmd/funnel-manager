@@ -2,9 +2,9 @@ import type { Project, FunnelNodeData } from "./types";
 import type { Node, Edge } from "reactflow";
 
 export const DEMO_PROJECTS: Project[] = [
-  { id: "closers",  name: "Closers Digitales",  client: "Luis Romero",   status: "active",    progress: 42, blockedCount: 1 },
-  { id: "viralidad",name: "Reto Viralidad",     client: "Victor Heras",  status: "active",    progress: 67, blockedCount: 0 },
-  { id: "skool-q2", name: "Skool Q2",           client: "—",             status: "draft",     progress: 0,  blockedCount: 0 },
+  { id: "closers",  name: "Closers Digitales",  description: "", client: "Luis Romero",   status: "active", progress: 42, blockedCount: 1 },
+  { id: "viralidad",name: "Reto Viralidad",     description: "", client: "Victor Heras",  status: "active", progress: 67, blockedCount: 0 },
+  { id: "skool-q2", name: "Skool Q2",           description: "", client: "—",             status: "draft",  progress: 0,  blockedCount: 0 },
 ];
 
 export const DEMO_NODES: Node<FunnelNodeData>[] = [

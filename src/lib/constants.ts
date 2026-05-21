@@ -27,6 +27,30 @@ export const PROJECT_STATUSES = {
 export type ProjectStatus = keyof typeof PROJECT_STATUSES;
 export type RoleKey = keyof typeof ROLE_COLORS;
 
+/* ── Colores de alerta para tareas con fechas ─────────── */
+export const ALERT_COLORS = {
+  done:         { bg: "#10B98115", fg: "#10B981", label: "Completada"   },
+  no_date:      { bg: "transparent", fg: "var(--text2)", label: "Sin fecha" },
+  on_track:     { bg: "#3B82F615", fg: "#3B82F6", label: "En plazo"     },
+  due_soon:     { bg: "#F59E0B15", fg: "#F59E0B", label: "Pronto vence" },
+  due_tomorrow: { bg: "#F9731615", fg: "#F97316", label: "Vence mañana" },
+  due_today:    { bg: "#E24B4A15", fg: "#E24B4A", label: "Vence HOY"    },
+  overdue:      { bg: "#DC262615", fg: "#DC2626", label: "Vencida"      },
+} as const;
+
+export const PRIORITY_COLORS = {
+  low:    { bg: "#9CA3AF15", fg: "#6B7280", label: "Baja"     },
+  normal: { bg: "#6366F115", fg: "#6366F1", label: "Normal"   },
+  high:   { bg: "#F59E0B15", fg: "#F59E0B", label: "Alta"     },
+  urgent: { bg: "#DC262615", fg: "#DC2626", label: "Urgente"  },
+} as const;
+
+export const PLATFORM_ROLE_LABELS = {
+  super_admin: "Super Admin",
+  admin:       "Administrador",
+  user:        "Usuario",
+} as const;
+
 /* ── Task suggestions per role (auto-completar tareas comunes) ─ */
 export const TASK_SUGGESTIONS: Record<string, string[]> = {
   trafficker: [

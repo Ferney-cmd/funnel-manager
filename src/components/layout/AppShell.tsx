@@ -8,13 +8,16 @@ import { createClient } from "@/lib/supabase/client";
 import { Sidebar }      from "./Sidebar";
 import { Topbar }       from "./Topbar";
 import { FunnelCanvas } from "@/components/canvas/FunnelCanvas";
-import { TeamModal }    from "@/components/team/TeamModal";
-import { Dashboard }    from "@/components/dashboard/Dashboard";
-import { RolesView }   from "@/components/views/RolesView";
-import { DocsView }    from "@/components/views/DocsView";
-import { getCurrentProfile, getInitials, type Profile } from "@/lib/profiles";
+import { TeamModal }     from "@/components/team/TeamModal";
+import { Dashboard }     from "@/components/dashboard/Dashboard";
+import { RolesView }     from "@/components/views/RolesView";
+import { DocsView }      from "@/components/views/DocsView";
+import { BoardView }     from "@/components/views/BoardView";
+import { AdminView }     from "@/components/views/AdminView";
+import { ProjectWizard } from "@/components/project/ProjectWizard";
+import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
-import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData } from "@/lib/types";
+import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/constants";
 
 function uid() {
@@ -43,6 +46,8 @@ export function AppShell() {
   const [loading,          setLoading]           = useState(true);
   const [teamOpen,         setTeamOpen]          = useState(false);
   const [profileOpen,      setProfileOpen]        = useState(false);
+  const [wizardOpen,       setWizardOpen]         = useState(false);
+  const [wizardParentId,   setWizardParentId]     = useState<string | null>(null);
   const [me,               setMe]               = useState<Profile | null>(null);
   const [membersByProject, setMembersByProject]  = useState<Record<string, ProjectMember[]>>({});
   const [onlineUsers,      setOnlineUsers]       = useState<string[]>([]);
@@ -69,8 +74,15 @@ export function AppShell() {
 
         if (projs && projs.length > 0) {
           const mapped: Project[] = projs.map((p: any) => ({
-            id: p.id, name: p.name, client: p.client || "",
-            status: p.status, progress: 0, blockedCount: 0,
+            id: p.id, name: p.name,
+            description:     p.description || "",
+            client:          p.client || "",
+            status:          p.status,
+            progress:        0,
+            blockedCount:    0,
+            parentProjectId: p.parent_project_id ?? null,
+            startDate:       p.start_date ?? null,
+            endDate:         p.end_date   ?? null,
           }));
           setProjects(mapped);
           setActiveProjectId(mapped[0].id);
@@ -174,7 +186,16 @@ export function AppShell() {
             hasUnread,
             tasks: (n.node_tasks || [])
               .sort((a: any, b: any) => a.ord - b.ord)
-              .map((t: any) => ({ id: t.id, text: t.text, done: t.done, order: t.ord })),
+              .map((t: any) => ({
+                id:          t.id,
+                text:        t.text,
+                description: t.description || "",
+                done:        t.done,
+                order:       t.ord,
+                dueDate:     t.due_date   ?? null,
+                priority:    t.priority   ?? "normal",
+                assignedTo:  t.assigned_to ?? null,
+              })),
             messages,
           },
         };
@@ -296,7 +317,15 @@ export function AppShell() {
                   ...n,
                   data: {
                     ...n.data,
-                    tasks: [...n.data.tasks, { id: t.id, text: t.text, done: t.done, order: t.ord }]
+                    tasks: [...n.data.tasks, {
+                      id:       t.id,
+                      text:     t.text,
+                      description: t.description || "",
+                      done:     t.done,
+                      order:    t.ord,
+                      dueDate:  t.due_date  ?? null,
+                      priority: t.priority  ?? "normal",
+                    }]
                       .sort((a, b) => a.order - b.order),
                   },
                 }
@@ -627,13 +656,15 @@ export function AppShell() {
   }, [activeProjectId, supabase]);
 
   /* ── Add task to node ───────────────────────────────────────── */
-  const handleAddTask = useCallback((nodeId: string, text: string) => {
+  const handleAddTask = useCallback((nodeId: string, text: string, dueDate?: string, priority?: TaskPriority) => {
     const taskId = `t-${uid()}`;
     const nodes  = nodesMap[activeProjectId] ?? [];
     const node   = nodes.find((n) => n.id === nodeId);
     const order  = node?.data.tasks.length ?? 0;
     supabase.from("node_tasks").insert({
       id: taskId, node_id: nodeId, text, done: false, ord: order,
+      due_date: dueDate   || null,
+      priority: priority  || "normal",
     }).then(() => {});
     setNodesMap((prev) => ({
       ...prev,
@@ -642,12 +673,45 @@ export function AppShell() {
           ...n,
           data: {
             ...n.data,
-            tasks: [...n.data.tasks, { id: taskId, text, done: false, order }],
+            tasks: [...n.data.tasks, {
+              id: taskId, text, done: false, order,
+              dueDate:  dueDate  ?? null,
+              priority: priority ?? "normal",
+            }],
           },
         }
       ),
     }));
   }, [activeProjectId, nodesMap, supabase]);
+
+  /* ── Update task fields (text / dueDate / priority / assignedTo) ─── */
+  const handleUpdateTask = useCallback((
+    nodeId: string,
+    taskId: string,
+    updates: { text?: string; dueDate?: string | null; priority?: TaskPriority; assignedTo?: string | null }
+  ) => {
+    setNodesMap((prev) => ({
+      ...prev,
+      [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
+        n.id !== nodeId ? n : {
+          ...n,
+          data: {
+            ...n.data,
+            tasks: n.data.tasks.map((t) =>
+              t.id !== taskId ? t : { ...t, ...updates }
+            ),
+          },
+        }
+      ),
+    }));
+    const db: Record<string, unknown> = {};
+    if (updates.text       !== undefined) db.text        = updates.text;
+    if (updates.dueDate    !== undefined) db.due_date    = updates.dueDate;
+    if (updates.priority   !== undefined) db.priority    = updates.priority;
+    if (updates.assignedTo !== undefined) db.assigned_to = updates.assignedTo;
+    if (Object.keys(db).length)
+      supabase.from("node_tasks").update(db).eq("id", taskId).then(() => {});
+  }, [activeProjectId, supabase]);
 
   /* ── Send text message ──────────────────────────────────────── */
   const handleSendMessage = useCallback((nodeId: string, text: string) => {
@@ -852,25 +916,49 @@ export function AppShell() {
     supabase.from("funnel_zones").delete().eq("id", zoneId).then(() => {});
   }, [activeProjectId, supabase]);
 
-  /* ── New project ────────────────────────────────────────────── */
-  const handleNewProject = useCallback(async () => {
-    const { data: { user }, error: authErr } = await supabase.auth.getUser();
-    if (authErr || !user) { alert("Error de auth: " + (authErr?.message ?? "sin sesión")); return; }
+  /* ── New project (abre el wizard) ───────────────────────────── */
+  const handleNewProject = useCallback(() => {
+    setWizardParentId(null);
+    setWizardOpen(true);
+  }, []);
+
+  const handleNewSubproject = useCallback(() => {
+    if (!activeProjectId) return;
+    setWizardParentId(activeProjectId);
+    setWizardOpen(true);
+  }, [activeProjectId]);
+
+  /* ── Wizard finished — recarga el proyecto recién creado ────── */
+  const handleWizardCreated = useCallback(async (projectId: string) => {
     const { data, error } = await supabase
       .from("projects")
-      .insert({ user_id: user.id, name: "Nuevo Proyecto", client: "—", status: "draft" })
-      .select().single();
-    if (error) { alert("Error al crear proyecto: " + error.message); return; }
-    if (!data)  { alert("No se pudo crear el proyecto (sin datos)"); return; }
+      .select("*")
+      .eq("id", projectId)
+      .single();
+    if (error || !data) return;
 
     const newProject: Project = {
-      id: data.id, name: data.name, client: data.client,
-      status: data.status, progress: 0, blockedCount: 0,
+      id:              data.id,
+      name:            data.name,
+      description:     data.description || "",
+      client:          data.client || "",
+      status:          data.status,
+      progress:        0,
+      blockedCount:    0,
+      parentProjectId: data.parent_project_id ?? null,
+      startDate:       data.start_date ?? null,
+      endDate:         data.end_date   ?? null,
     };
     setProjects((prev) => [...prev, newProject]);
-    setNodesMap((prev)  => ({ ...prev, [data.id]: [] }));
-    setEdgesMap((prev)  => ({ ...prev, [data.id]: [] }));
-    setZonesMap((prev)  => ({ ...prev, [data.id]: [] }));
+    setNodesMap((prev) => ({ ...prev, [data.id]: [] }));
+    setEdgesMap((prev) => ({ ...prev, [data.id]: [] }));
+    setZonesMap((prev) => ({ ...prev, [data.id]: [] }));
+    // limpia cache para que cargue nodos/tasks creados por el wizard
+    setNodesMap((prev) => {
+      const next = { ...prev };
+      delete next[data.id];
+      return next;
+    });
     setActiveProjectId(data.id);
   }, [supabase]);
 
@@ -943,8 +1031,15 @@ export function AppShell() {
     }));
 
     setProjects((prev) => [...prev, {
-      id: newProj.id, name: newProj.name, client: newProj.client,
-      status: newProj.status, progress: 0, blockedCount: 0,
+      id: newProj.id, name: newProj.name,
+      description:     newProj.description || "",
+      client:          newProj.client,
+      status:          newProj.status,
+      progress:        0,
+      blockedCount:    0,
+      parentProjectId: newProj.parent_project_id ?? null,
+      startDate:       newProj.start_date ?? null,
+      endDate:         newProj.end_date   ?? null,
     }]);
     setNodesMap((prev) => ({ ...prev, [newProj.id]: newNodes }));
     setEdgesMap((prev) => ({ ...prev, [newProj.id]: newEdges }));
@@ -1006,7 +1101,8 @@ export function AppShell() {
           onDeleteTask:     (taskId: string) => handleDeleteTask(n.id, taskId),
           onMarkRead:       ()               => handleMarkRead(n.id),
           onSendMessage:    (text: string)   => handleSendMessage(n.id, text),
-          onAddTask:        (text: string)   => handleAddTask(n.id, text),
+          onAddTask:        (text: string, dueDate?: string | null, priority?: TaskPriority) => handleAddTask(n.id, text, dueDate ?? undefined, priority),
+          onUpdateTask:     (taskId: string, upd) => handleUpdateTask(n.id, taskId, upd),
           onUpdateNodeData: (updates)        => handleUpdateNodeData(n.id, updates),
           onUploadFile:     (file: File)     => handleUploadFile(n.id, file),
         },
@@ -1051,19 +1147,27 @@ export function AppShell() {
   /* ── Empty state ────────────────────────────────────────────── */
   if (projects.length === 0) {
     return (
-      <div className="app-loading">
-        <div className="app-loading-icon">⚡</div>
-        <p style={{ color: "var(--text2)", marginBottom: 16 }}>No tienes proyectos aún.</p>
-        <button
-          onClick={handleNewProject}
-          style={{
-            background: "var(--brand)", color: "#fff", border: "none",
-            padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-          }}
-        >
-          + Crear primer proyecto
-        </button>
-      </div>
+      <>
+        <div className="app-loading">
+          <div className="app-loading-icon">⚡</div>
+          <p style={{ color: "var(--text2)", marginBottom: 16 }}>No tienes proyectos aún.</p>
+          <button
+            onClick={handleNewProject}
+            style={{
+              background: "var(--brand)", color: "#fff", border: "none",
+              padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+            }}
+          >
+            + Crear primer proyecto
+          </button>
+        </div>
+        <ProjectWizard
+          open={wizardOpen}
+          parentProjectId={wizardParentId}
+          onClose={() => setWizardOpen(false)}
+          onCreated={handleWizardCreated}
+        />
+      </>
     );
   }
 
@@ -1078,12 +1182,14 @@ export function AppShell() {
         activeView={activeView}
         onSelectView={setActiveView}
         onNewProject={handleNewProject}
+        onNewSubproject={handleNewSubproject}
         onDeleteProject={handleDeleteProject}
         onAddModule={handleAddModule}
         onAddZone={handleAddZone}
         onLogout={handleLogout}
         me={me}
         onOpenProfile={() => setProfileOpen(true)}
+        isAdmin={isPlatformAdmin(me)}
       />
       <Topbar
         projectId={activeProjectId}
@@ -1105,6 +1211,24 @@ export function AppShell() {
           onEdgesChange={handleEdgesChange}
           onConnect={handleConnect}
         />
+      )}
+
+      {activeView === "board" && (
+        <div className="view-scroll">
+          <BoardView
+            project={activeProject}
+            nodes={currentNodes}
+            members={currentMembers}
+            me={me}
+            onAddTask={handleAddTask}
+            onToggleTask={handleTaskToggle}
+            onDeleteTask={handleDeleteTask}
+            onSendMessage={handleSendMessage}
+            onAddModule={handleAddModule}
+            onUpdateTask={handleUpdateTask}
+            onSelectView={setActiveView}
+          />
+        </div>
       )}
 
       {activeView === "tablero" && (
@@ -1129,6 +1253,12 @@ export function AppShell() {
         </div>
       )}
 
+      {activeView === "admin" && isPlatformAdmin(me) && (
+        <div className="view-scroll">
+          <AdminView me={me} />
+        </div>
+      )}
+
       {teamOpen && (
         <TeamModal projectId={activeProjectId} onClose={() => setTeamOpen(false)} />
       )}
@@ -1140,6 +1270,18 @@ export function AppShell() {
           onUpdate={handleUpdateProfile}
         />
       )}
+
+      <ProjectWizard
+        open={wizardOpen}
+        parentProjectId={wizardParentId}
+        parentProjectName={
+          wizardParentId
+            ? projects.find((p) => p.id === wizardParentId)?.name
+            : undefined
+        }
+        onClose={() => setWizardOpen(false)}
+        onCreated={handleWizardCreated}
+      />
     </div>
   );
 }

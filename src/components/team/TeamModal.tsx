@@ -50,7 +50,7 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
 
     const { data: profiles } = await supabase
       .from("profiles")
-      .select("id, full_name, email, color")
+      .select("id, full_name, email, color, platform_role")
       .order("full_name", { ascending: true });
     const allProfiles = (profiles || []) as Profile[];
     setAllUsers(allProfiles);
@@ -65,6 +65,7 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
       return {
         id: m.user_id, full_name: p?.full_name ?? "—", email: p?.email ?? "—",
         color: p?.color ?? "#7C3AED",
+        platform_role: p?.platform_role ?? "user",
         membership_id: m.id, member_role: m.role, is_owner: false,
       };
     });
@@ -76,6 +77,7 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
         full_name: ownerProf?.full_name ?? "—",
         email: ownerProf?.email ?? "—",
         color: ownerProf?.color ?? "#7C3AED",
+        platform_role: ownerProf?.platform_role ?? "user",
         membership_id: "__owner__",
         member_role: "owner",
         is_owner: true,
