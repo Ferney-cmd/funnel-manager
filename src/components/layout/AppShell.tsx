@@ -1219,7 +1219,6 @@ export function AppShell() {
             project={activeProject}
             nodes={currentNodes}
             members={currentMembers}
-            me={me}
             onAddTask={handleAddTask}
             onToggleTask={handleTaskToggle}
             onDeleteTask={handleDeleteTask}

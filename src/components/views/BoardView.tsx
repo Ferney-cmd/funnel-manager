@@ -5,13 +5,12 @@ import type { Node } from "reactflow";
 import type { FunnelNodeData, ProjectMember, Project, TaskPriority } from "@/lib/types";
 import { ROLE_LABELS, ROLE_COLORS, ALERT_COLORS, PRIORITY_COLORS } from "@/lib/constants";
 import { computeTaskAlertStatus } from "@/lib/types";
-import { getInitials, type Profile } from "@/lib/profiles";
+import { getInitials } from "@/lib/profiles";
 
 interface BoardViewProps {
   project:       Project | undefined;
   nodes:         Node<FunnelNodeData>[];
   members:       ProjectMember[];
-  me:            Profile | null;
   onAddTask:     (nodeId: string, text: string, dueDate?: string, priority?: TaskPriority) => void;
   onToggleTask:  (nodeId: string, taskId: string) => void;
   onDeleteTask:  (nodeId: string, taskId: string) => void;
@@ -28,7 +27,7 @@ interface AddState {
 }
 
 export function BoardView({
-  project, nodes, members, me,
+  project, nodes, members,
   onAddTask, onToggleTask, onDeleteTask, onSendMessage, onAddModule,
   onUpdateTask, onSelectView,
 }: BoardViewProps) {
