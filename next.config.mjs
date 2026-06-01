@@ -1,9 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
-    // ESLint warnings don't block production builds
     ignoreDuringBuilds: true,
   },
+  // Necesario para Docker / contenedores (reduce imagen de ~600MB a ~80MB)
+  output: "standalone",
 };
 
 export default nextConfig;
