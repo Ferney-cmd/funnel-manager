@@ -55,21 +55,21 @@
   --radius-inner: 7px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --surface:     #13111C;
-    --surface2:    #1A1730;
-    --surface3:    #0F0D1A;
-    --border:      #2D2849;
-    --border2:     #3D3460;
-    --text:        #F3F0FF;
-    --text2:       #9C86C0;
-    --text3:       #6B5FA0;
-    --canvas-bg:   #0F0D1A;
-    --dot-color:   #2D2849;
-    --topbar-bg:   #13111C;
-    --topbar-border:#2D2849;
-  }
+/* Tema oscuro: lo aplica next-themes poniendo data-theme="dark" en <html>
+   (incluye la opción "Sistema", que resuelve a light/dark según el SO). */
+[data-theme="dark"] {
+  --surface:     #13111C;
+  --surface2:    #1A1730;
+  --surface3:    #0F0D1A;
+  --border:      #2D2849;
+  --border2:     #3D3460;
+  --text:        #F3F0FF;
+  --text2:       #9C86C0;
+  --text3:       #6B5FA0;
+  --canvas-bg:   #0F0D1A;
+  --dot-color:   #2D2849;
+  --topbar-bg:   #13111C;
+  --topbar-border:#2D2849;
 }
 
 /* ── Base ────────────────────────────────────────────────────── */
@@ -3335,4 +3335,36 @@ body {
 }
 .perm-tr td {
   vertical-align: middle;
+}
+
+/* ── Theme toggle (Claro / Oscuro / Sistema) ── */
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0.55;
+  transition: background .12s, opacity .12s;
+}
+.theme-toggle-btn:hover  { opacity: 0.9; background: var(--surface3); }
+.theme-toggle-btn.active  {
+  opacity: 1;
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }

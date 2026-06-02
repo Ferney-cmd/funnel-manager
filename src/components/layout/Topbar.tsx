@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import type { Project, ProjectMember } from "@/lib/types";
 import { PROJECT_STATUSES } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
+import { ThemeToggle } from "./ThemeToggle";
 
 interface TopbarProps {
   projectId:   string;
@@ -107,6 +108,8 @@ export function Topbar({
           )}
         </div>
       )}
+
+      <ThemeToggle />
 
       <button className="topbar-btn" onClick={onOpenTeam} title="Gestionar equipo">
         <span>👥</span>

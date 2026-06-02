@@ -12,6 +12,7 @@
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.104.1",
     "next": "14.2.35",
+    "next-themes": "^0.4.6",
     "react": "^18",
     "react-dom": "^18",
     "reactflow": "^11.11.4"
