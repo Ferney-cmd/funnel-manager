@@ -30,12 +30,17 @@ const ROLE_COLOR: Record<string, string> = {
 export function TeamModal({ projectId, onClose }: TeamModalProps) {
   const supabase = createClient();
 
-  const [members,    setMembers]    = useState<Member[]>([]);
-  const [allUsers,   setAllUsers]   = useState<Profile[]>([]);
-  const [search,     setSearch]     = useState("");
-  const [loading,    setLoading]    = useState(true);
-  const [currentUid, setCurrentUid] = useState<string>("");
-  const [ownerUid,   setOwnerUid]   = useState<string>("");
+  const [members,       setMembers]       = useState<Member[]>([]);
+  const [allUsers,      setAllUsers]      = useState<Profile[]>([]);
+  const [search,        setSearch]        = useState("");
+  const [loading,       setLoading]       = useState(true);
+  const [currentUid,    setCurrentUid]    = useState<string>("");
+  const [ownerUid,      setOwnerUid]      = useState<string>("");
+  const [pendingInvites, setPendingInvites] =
+    useState<{ id: string; email: string; role: string; created_at: string }[]>([]);
+  const [inviteEmail,   setInviteEmail]   = useState("");
+  const [inviteRole,    setInviteRole]    = useState<"editor" | "viewer">("editor");
+  const [inviting,      setInviting]      = useState(false);
 
   async function loadData() {
     setLoading(true);
@@ -85,6 +90,15 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
     }
 
     setMembers(memberRows);
+
+    const { data: invites } = await supabase
+      .from("invitations")
+      .select("id, email, role, created_at")
+      .eq("project_id", projectId)
+      .eq("status", "pending")
+      .order("created_at", { ascending: false });
+    setPendingInvites((invites ?? []) as { id: string; email: string; role: string; created_at: string }[]);
+
     setLoading(false);
   }
 
@@ -117,6 +131,56 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
     loadData();
   }
 
+  async function inviteByEmail(rawEmail: string, role: "editor" | "viewer") {
+    const email = rawEmail.trim().toLowerCase();
+    if (!email.includes("@")) { alert("Introduce un email válido."); return; }
+
+    setInviting(true);
+    try {
+      // Look up an existing profile with that email (case-insensitive).
+      const { data: existing } = await supabase
+        .from("profiles").select("id").ilike("email", email).maybeSingle();
+
+      if (existing?.id) {
+        // Profile exists → add directly as a project member.
+        const { error } = await supabase.from("project_members").insert({
+          project_id: projectId, user_id: existing.id, role, invited_by: currentUid,
+        });
+        if (error) {
+          if (error.code === "23505") { alert("Ya es miembro del proyecto."); }
+          else { alert("No se pudo agregar: " + error.message); }
+          return;
+        }
+        setInviteEmail("");
+        loadData();
+        return;
+      }
+
+      // No profile yet → create a pending invitation.
+      const { error } = await supabase.from("invitations").insert({
+        project_id: projectId, email, role, invited_by: currentUid, status: "pending",
+      });
+      if (error) {
+        if (error.code === "23505") { alert("Ya existe una invitación pendiente para ese email."); }
+        else { alert("No se pudo invitar: " + error.message); }
+        return;
+      }
+      alert("Invitación pendiente enviada. " +
+        "La persona obtendrá acceso automáticamente cuando se registre con ese email.");
+      setInviteEmail("");
+      loadData();
+    } finally {
+      setInviting(false);
+    }
+  }
+
+  async function revokeInvite(id: string) {
+    const { error } = await supabase
+      .from("invitations").update({ status: "revoked" }).eq("id", id);
+    if (error) { alert("No se pudo revocar: " + error.message); return; }
+    loadData();
+  }
+
   const memberIds   = new Set(members.map((m) => m.id));
   const q           = search.trim().toLowerCase();
   const candidates  = allUsers
@@ -145,7 +209,41 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
           <>
             {isOwner && (
               <div className="modal-section">
-                <div className="modal-section-label">Invitar usuario</div>
+                <div className="modal-section-label">Invitar por email</div>
+                <div style={{ display: "flex", gap: 8, alignItems: "stretch" }}>
+                  <input
+                    type="email"
+                    value={inviteEmail}
+                    onChange={(e) => setInviteEmail(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !inviting) inviteByEmail(inviteEmail, inviteRole);
+                    }}
+                    placeholder="persona@email.com"
+                    className="modal-input"
+                    style={{ flex: 1, marginBottom: 0 }}
+                  />
+                  <select
+                    value={inviteRole}
+                    onChange={(e) => setInviteRole(e.target.value as "editor" | "viewer")}
+                    className="role-select"
+                    style={{ minWidth: 110 }}>
+                    <option value="editor">Editor</option>
+                    <option value="viewer">Colaborador</option>
+                  </select>
+                  <button
+                    className="btn-mini-primary"
+                    disabled={inviting}
+                    onClick={() => inviteByEmail(inviteEmail, inviteRole)}>
+                    {inviting ? "Invitando…" : "Invitar"}
+                  </button>
+                </div>
+                <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>
+                  Puedes invitar a personas aunque todavía no tengan cuenta.
+                </div>
+
+                <div className="modal-section-label" style={{ marginTop: 16 }}>
+                  Buscar usuario existente
+                </div>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -237,6 +335,38 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
                 </div>
               ))}
             </div>
+
+            {isOwner && pendingInvites.length > 0 && (
+              <div className="modal-section">
+                <div className="modal-section-label">
+                  Invitaciones pendientes ({pendingInvites.length})
+                </div>
+                {pendingInvites.map((inv) => (
+                  <div key={inv.id} className="member-row">
+                    <span className="member-avatar"
+                      style={{ background: "var(--text3)", color: "#fff" }}>
+                      @
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)",
+                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {inv.email}
+                      </div>
+                      <div style={{ fontSize: 11, color: "var(--text3)" }}>
+                        Pendiente de registro
+                      </div>
+                    </div>
+                    <span className="role-badge"
+                      style={{ background: `${ROLE_COLOR[inv.role] ?? ROLE_COLOR.viewer}22`,
+                        color: ROLE_COLOR[inv.role] ?? ROLE_COLOR.viewer }}>
+                      {ROLE_LABEL[inv.role] ?? inv.role}
+                    </span>
+                    <button onClick={() => revokeInvite(inv.id)}
+                      className="btn-mini-remove" title="Revocar invitación">✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
       </div>
