@@ -25,6 +25,7 @@ const BASE_VIEWS = [
   { id: "mytasks",  icon: "★",  label: "Mis Tareas" },
   { id: "canvas",   icon: "◈",  label: "Embudo"    },
   { id: "board",    icon: "▦",  label: "Dashboard" },
+  { id: "kanban",   icon: "▥",  label: "Kanban"    },
   { id: "roles",    icon: "◎",  label: "Roles"     },
   { id: "docs",     icon: "⊟",  label: "Docs"      },
   { id: "tablero",  icon: "▤",  label: "Resumen"   },

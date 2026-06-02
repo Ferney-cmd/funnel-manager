@@ -3479,3 +3479,159 @@ body {
   color: var(--text3);
   font-size: 13px;
 }
+
+/* ── Kanban view ─────────────────────────────────────── */
+.kb-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.kb-board {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding: 16px;
+  flex: 1;
+  min-height: 0;
+  align-items: flex-start;
+}
+.kb-col {
+  flex: 0 0 auto;
+  min-width: 260px;
+  width: 260px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  max-height: 100%;
+  min-height: 0;
+}
+.kb-col-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.kb-col-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.kb-col-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kb-col-count {
+  font-size: 12px;
+  color: var(--text3);
+  background: var(--surface3);
+  border-radius: 10px;
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+.kb-col-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  overflow-y: auto;
+  min-height: 80px;
+  flex: 1;
+  border-radius: 0 0 12px 12px;
+  transition: outline .12s, background .12s;
+}
+.kb-col-body.over {
+  outline: 2px dashed var(--brand);
+  outline-offset: -4px;
+  background: var(--surface3);
+}
+.kb-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  transition: border-color .12s, box-shadow .12s;
+}
+.kb-card:hover {
+  border-color: var(--brand);
+  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+}
+.kb-card:active { cursor: grabbing; }
+.kb-card.done {
+  opacity: .55;
+}
+.kb-card.done .kb-card-title {
+  text-decoration: line-through;
+}
+.kb-card-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  line-height: 1.35;
+}
+.kb-card-origin {
+  font-size: 11px;
+  color: var(--text2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.kb-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 2px;
+}
+.kb-chip {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.kb-chip.kb-date {
+  background: var(--surface2);
+  color: var(--text2);
+  border: 1px solid var(--border);
+  font-weight: 500;
+}
+.kb-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  color: #fff;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.kb-col-empty {
+  text-align: center;
+  color: var(--text3);
+  font-size: 12px;
+  padding: 8px 0;
+}
+.kb-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 14px;
+}

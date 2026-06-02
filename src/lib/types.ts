@@ -49,6 +49,15 @@ export interface NodeTask {
   priority?:   TaskPriority;
   alertStatus?: TaskAlertStatus;
   assignedTo?: string | null;
+  statusId?: string | null;
+}
+
+export interface TaskStatus {
+  id:       string;
+  name:     string;
+  color:    string;
+  category: "todo" | "in_progress" | "done";
+  position: number;
 }
 
 export interface ChatMessage {

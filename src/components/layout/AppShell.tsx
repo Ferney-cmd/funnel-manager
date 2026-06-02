@@ -13,13 +13,14 @@ import { Dashboard }     from "@/components/dashboard/Dashboard";
 import { RolesView }     from "@/components/views/RolesView";
 import { DocsView }      from "@/components/views/DocsView";
 import { BoardView }     from "@/components/views/BoardView";
+import { KanbanView }    from "@/components/views/KanbanView";
 import { MyTasksView }   from "@/components/views/MyTasksView";
 import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
-import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole } from "@/lib/types";
+import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
 import { ROLE_LABELS } from "@/lib/constants";
 
 function uid() {
@@ -64,6 +65,7 @@ export function AppShell() {
   const [wizardParentId,   setWizardParentId]     = useState<string | null>(null);
   const [me,               setMe]               = useState<Profile | null>(null);
   const [membersByProject, setMembersByProject]  = useState<Record<string, ProjectMember[]>>({});
+  const [statusesByProject, setStatusesByProject] = useState<Record<string, TaskStatus[]>>({});
   const [onlineUsers,      setOnlineUsers]       = useState<string[]>([]);
   const [commentsByTask,   setCommentsByTask]    = useState<Record<string, import("@/lib/types").TaskComment[]>>({});
   const [loadingComments,  setLoadingComments]   = useState<Record<string, boolean>>({});
@@ -170,6 +172,25 @@ export function AppShell() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]);
 
+  /* ── Load task_statuses of active project ───────────────────── */
+  useEffect(() => {
+    if (!activeProjectId || statusesByProject[activeProjectId]) return;
+    async function loadStatuses() {
+      const { data } = await supabase
+        .from("task_statuses")
+        .select("id, name, color, category, position")
+        .eq("project_id", activeProjectId)
+        .order("position");
+      const mapped: TaskStatus[] = (data || []).map((s: any) => ({
+        id: s.id, name: s.name, color: s.color,
+        category: s.category, position: s.position,
+      }));
+      setStatusesByProject((prev) => ({ ...prev, [activeProjectId]: mapped }));
+    }
+    loadStatuses();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeProjectId]);
+
   /* ── Reusable loader: fetch + populate maps for a project ───── */
   const loadProjectData = useCallback(async (projectId: string) => {
     if (!projectId) return;
@@ -229,6 +250,7 @@ export function AppShell() {
                 dueDate:     t.due_date   ?? null,
                 priority:    t.priority   ?? "normal",
                 assignedTo:  t.assigned_to ?? null,
+                statusId:    t.status_id  ?? null,
               })),
             messages,
           },
@@ -335,7 +357,7 @@ export function AppShell() {
                 data: {
                   ...n.data,
                   tasks: n.data.tasks.map((tk) =>
-                    tk.id !== t.id ? tk : { ...tk, done: t.done }
+                    tk.id !== t.id ? tk : { ...tk, done: t.done, statusId: t.status_id ?? tk.statusId }
                   ),
                 },
               })),
@@ -830,6 +852,26 @@ export function AppShell() {
       });
   }, [activeProjectId, supabase]);
 
+  /* ── Move task to a different status (Kanban drag) ──────────── */
+  const handleMoveTask = useCallback((nodeId: string, taskId: string, statusId: string, done: boolean) => {
+    let snapshot: NodesMap | null = null;
+    setNodesMap((prev) => {
+      snapshot = prev;
+      return {
+        ...prev,
+        [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
+          n.id !== nodeId ? n : {
+            ...n,
+            data: { ...n.data, tasks: n.data.tasks.map((t) => t.id === taskId ? { ...t, statusId, done } : t) },
+          }
+        ),
+      };
+    });
+    supabase.from("node_tasks").update({ status_id: statusId, done }).eq("id", taskId).then(({ error }) => {
+      if (error && snapshot) { setNodesMap(snapshot); alert("No se pudo mover la tarea: " + error.message); }
+    });
+  }, [activeProjectId, supabase]);
+
   /* ── Load comments for a task (lazy, once per task) ─────────── */
   const handleLoadComments = useCallback((taskId: string) => {
     setCommentsByTask((cur) => {
@@ -1255,7 +1297,8 @@ export function AppShell() {
   }, [supabase]);
 
   /* ── Inject callbacks + members into funnel nodes ───────────── */
-  const currentMembers = membersByProject[activeProjectId] ?? [];
+  const currentMembers  = membersByProject[activeProjectId] ?? [];
+  const currentStatuses = statusesByProject[activeProjectId] ?? [];
   const nodesWithCallbacks = useMemo<Node<FunnelNodeData>[]>(() => {
     const activeProj = projects.find((p) => p.id === activeProjectId);
     const myRole = getMyProjectRole(me?.id, activeProj, currentMembers);
@@ -1442,6 +1485,23 @@ export function AppShell() {
             loadingComments={loadingComments}
             onLoadComments={handleLoadComments}
             onAddComment={handleAddComment}
+          />
+        </div>
+      )}
+
+      {activeView === "kanban" && (
+        <div className="view-scroll">
+          <KanbanView
+            project={activeProject}
+            nodes={currentNodes}
+            statuses={currentStatuses}
+            members={currentMembers}
+            canEdit={
+              getMyProjectRole(me?.id, activeProject, currentMembers) === "owner" ||
+              getMyProjectRole(me?.id, activeProject, currentMembers) === "editor"
+            }
+            onMoveTask={handleMoveTask}
+            onSelectView={setActiveView}
           />
         </div>
       )}
