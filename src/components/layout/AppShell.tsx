@@ -1566,7 +1566,19 @@ export function AppShell() {
       )}
 
       {teamOpen && (
-        <TeamModal projectId={activeProjectId} onClose={() => setTeamOpen(false)} />
+        <TeamModal
+          projectId={activeProjectId}
+          onClose={() => {
+            setTeamOpen(false);
+            // Refresca la lista de miembros del proyecto para que el selector
+            // de responsable vea a los recién agregados (invalida el cache).
+            setMembersByProject((prev) => {
+              const next = { ...prev };
+              delete next[activeProjectId];
+              return next;
+            });
+          }}
+        />
       )}
 
       {profileOpen && me && (

@@ -65,15 +65,18 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
       .select("id, user_id, role")
       .eq("project_id", projectId);
 
-    const memberRows: Member[] = (ms ?? []).map((m: any) => {
-      const p = allProfiles.find((u) => u.id === m.user_id);
-      return {
-        id: m.user_id, full_name: p?.full_name ?? "—", email: p?.email ?? "—",
-        color: p?.color ?? "#7C3AED",
-        platform_role: p?.platform_role ?? "user",
-        membership_id: m.id, member_role: m.role, is_owner: false,
-      };
-    });
+    const memberRows: Member[] = (ms ?? [])
+      // El dueño se muestra aparte; si también tiene fila en project_members, no duplicar
+      .filter((m: any) => m.user_id !== project?.user_id)
+      .map((m: any) => {
+        const p = allProfiles.find((u) => u.id === m.user_id);
+        return {
+          id: m.user_id, full_name: p?.full_name ?? "—", email: p?.email ?? "—",
+          color: p?.color ?? "#7C3AED",
+          platform_role: p?.platform_role ?? "user",
+          membership_id: m.id, member_role: m.role, is_owner: false,
+        };
+      });
 
     if (project?.user_id) {
       const ownerProf = allProfiles.find((u) => u.id === project.user_id);
