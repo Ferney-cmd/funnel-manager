@@ -13,6 +13,7 @@ import { Dashboard }     from "@/components/dashboard/Dashboard";
 import { RolesView }     from "@/components/views/RolesView";
 import { DocsView }      from "@/components/views/DocsView";
 import { BoardView }     from "@/components/views/BoardView";
+import { MyTasksView }   from "@/components/views/MyTasksView";
 import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
@@ -1441,6 +1442,15 @@ export function AppShell() {
             loadingComments={loadingComments}
             onLoadComments={handleLoadComments}
             onAddComment={handleAddComment}
+          />
+        </div>
+      )}
+
+      {activeView === "mytasks" && (
+        <div className="view-scroll">
+          <MyTasksView
+            me={me}
+            onOpenTaskProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
           />
         </div>
       )}

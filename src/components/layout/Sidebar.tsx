@@ -22,6 +22,7 @@ interface SidebarProps {
 }
 
 const BASE_VIEWS = [
+  { id: "mytasks",  icon: "★",  label: "Mis Tareas" },
   { id: "canvas",   icon: "◈",  label: "Embudo"    },
   { id: "board",    icon: "▦",  label: "Dashboard" },
   { id: "roles",    icon: "◎",  label: "Roles"     },

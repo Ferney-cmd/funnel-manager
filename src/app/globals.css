@@ -3368,3 +3368,114 @@ body {
   background: var(--surface);
   box-shadow: 0 1px 3px rgba(0,0,0,0.12);
 }
+
+/* ── Mis Tareas (mt-*) ── */
+.mt-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+.mt-section {
+  display: flex;
+  flex-direction: column;
+}
+.mt-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 24px 6px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.mt-section-toggle {
+  width: 100%;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: uppercase;
+  color: var(--text2);
+}
+.mt-section-toggle:hover { color: var(--text); }
+.mt-section-count {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 1px 8px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 40px;
+  padding: 6px 24px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+.mt-row:hover { background: var(--surface2); }
+.mt-check { flex-shrink: 0; }
+.mt-title {
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1 1 40%;
+  min-width: 0;
+}
+.mt-title.done {
+  text-decoration: line-through;
+  color: var(--text3);
+}
+.mt-origin {
+  font-size: 11px;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+  flex-shrink: 1;
+}
+.mt-date {
+  font-size: 12px;
+  color: var(--text2);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 54px;
+  text-align: right;
+}
+.mt-priority {
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.mt-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 14px;
+}
+.mt-loading {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text3);
+  font-size: 13px;
+}
