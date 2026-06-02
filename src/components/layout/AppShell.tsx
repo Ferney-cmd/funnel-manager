@@ -73,6 +73,21 @@ export function AppShell() {
   useEffect(() => { activeProjectIdRef.current = activeProjectId; }, [activeProjectId]);
   useEffect(() => { meRef.current = me; }, [me]);
 
+  /* ── Persistencia de UI efímera (último proyecto + pestaña) ──── */
+  // Restaura la última pestaña usada al montar
+  useEffect(() => {
+    const v = typeof window !== "undefined" ? localStorage.getItem("fm_lastView") : null;
+    if (v) setActiveView(v);
+  }, []);
+  // Guarda el proyecto activo y la pestaña cuando cambian
+  useEffect(() => {
+    if (activeProjectId && typeof window !== "undefined")
+      localStorage.setItem("fm_lastProjectId", activeProjectId);
+  }, [activeProjectId]);
+  useEffect(() => {
+    if (typeof window !== "undefined") localStorage.setItem("fm_lastView", activeView);
+  }, [activeView]);
+
   /* ── Load profile + projects on mount ───────────────────────── */
   useEffect(() => {
     async function init() {
@@ -101,7 +116,10 @@ export function AppShell() {
             endDate:         p.end_date   ?? null,
           }));
           setProjects(mapped);
-          setActiveProjectId(mapped[0].id);
+          // Restaura el último proyecto usado si sigue existiendo; si no, el primero
+          const savedId = typeof window !== "undefined" ? localStorage.getItem("fm_lastProjectId") : null;
+          const initialId = savedId && mapped.some((p) => p.id === savedId) ? savedId : mapped[0].id;
+          setActiveProjectId(initialId);
         }
       } catch (err) {
         console.error("Error al inicializar AppShell:", err);
