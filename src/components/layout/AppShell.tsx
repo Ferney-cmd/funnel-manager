@@ -151,28 +151,27 @@ export function AppShell() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]);
 
-  /* ── Load nodes + zones + edges when project changes ────────── */
-  useEffect(() => {
-    if (!activeProjectId || nodesMap[activeProjectId] !== undefined) return;
+  /* ── Reusable loader: fetch + populate maps for a project ───── */
+  const loadProjectData = useCallback(async (projectId: string) => {
+    if (!projectId) return;
 
-    async function loadProject() {
-      const [{ data: nodesData }, { data: edgesData }, { data: zonesData }] = await Promise.all([
-        supabase
-          .from("funnel_nodes")
-          .select("*, node_tasks(*), node_messages(*)")
-          .eq("project_id", activeProjectId),
-        supabase
-          .from("funnel_edges")
-          .select("*")
-          .eq("project_id", activeProjectId),
-        supabase
-          .from("funnel_zones")
-          .select("*")
-          .eq("project_id", activeProjectId),
-      ]);
+    const [{ data: nodesData }, { data: edgesData }, { data: zonesData }] = await Promise.all([
+      supabase
+        .from("funnel_nodes")
+        .select("*, node_tasks(*), node_messages(*)")
+        .eq("project_id", projectId),
+      supabase
+        .from("funnel_edges")
+        .select("*")
+        .eq("project_id", projectId),
+      supabase
+        .from("funnel_zones")
+        .select("*")
+        .eq("project_id", projectId),
+    ]);
 
-      const myId = meRef.current?.id;
-      const rawNodes: Node<FunnelNodeData>[] = (nodesData || []).map((n: any) => {
+    const myId = meRef.current?.id;
+    const rawNodes: Node<FunnelNodeData>[] = (nodesData || []).map((n: any) => {
         const messages: import("@/lib/types").ChatMessage[] = (n.node_messages || [])
           .sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
           .map((m: any) => ({
@@ -234,16 +233,25 @@ export function AppShell() {
         data: { label: z.label, color: z.color, width: z.width, height: z.height },
       }));
 
-      setNodesMap((prev) => ({ ...prev, [activeProjectId]: nodes }));
-      setEdgesMap((prev) => ({ ...prev, [activeProjectId]: edges }));
-      setZonesMap((prev) => ({ ...prev, [activeProjectId]: zones }));
+    setNodesMap((prev) => ({ ...prev, [projectId]: nodes }));
+    setEdgesMap((prev) => ({ ...prev, [projectId]: edges }));
+    setZonesMap((prev) => ({ ...prev, [projectId]: zones }));
 
-      const progress = computeProgress(nodes);
-      setProjects((prev) =>
-        prev.map((p) => (p.id === activeProjectId ? { ...p, progress } : p))
-      );
-    }
-    loadProject();
+    const progress = computeProgress(nodes);
+    setProjects((prev) =>
+      prev.map((p) => (p.id === projectId ? { ...p, progress } : p))
+    );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Stable ref to the loader for use inside the realtime subscribe callback
+  const loadProjectDataRef = useRef(loadProjectData);
+  useEffect(() => { loadProjectDataRef.current = loadProjectData; });
+
+  /* ── Load nodes + zones + edges when project changes ────────── */
+  useEffect(() => {
+    if (!activeProjectId || nodesMap[activeProjectId] !== undefined) return;
+    loadProjectData(activeProjectId);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId]);
 
@@ -258,7 +266,8 @@ export function AppShell() {
 
       /* ── PROBLEMA 1: chat ─────────────────────────────────── */
       .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "node_messages" },
+        { event: "INSERT", schema: "public", table: "node_messages",
+          filter: `project_id=eq.${pid}` },
         (payload) => {
           const m = payload.new as any;
           if (m.user_id === meRef.current?.id) return; // propio, ya está en estado
@@ -292,7 +301,8 @@ export function AppShell() {
 
       /* ── Tareas: toggle de otro usuario (UPDATE) ─────────── */
       .on("postgres_changes",
-        { event: "UPDATE", schema: "public", table: "node_tasks" },
+        { event: "UPDATE", schema: "public", table: "node_tasks",
+          filter: `project_id=eq.${pid}` },
         (payload) => {
           const t = payload.new as any;
           const cur = activeProjectIdRef.current;
@@ -317,7 +327,8 @@ export function AppShell() {
 
       /* ── Tareas: nueva tarea de otro usuario (INSERT) ────── */
       .on("postgres_changes",
-        { event: "INSERT", schema: "public", table: "node_tasks" },
+        { event: "INSERT", schema: "public", table: "node_tasks",
+          filter: `project_id=eq.${pid}` },
         (payload) => {
           const t = payload.new as any;
           const cur = activeProjectIdRef.current;
@@ -353,7 +364,8 @@ export function AppShell() {
 
       /* ── Tareas: eliminar tarea de otro usuario (DELETE) ─── */
       .on("postgres_changes",
-        { event: "DELETE", schema: "public", table: "node_tasks" },
+        { event: "DELETE", schema: "public", table: "node_tasks",
+          filter: `project_id=eq.${pid}` },
         (payload) => {
           const t = payload.old as any;
           if (!t?.id) return;
@@ -486,7 +498,57 @@ export function AppShell() {
         }
       )
 
-      .subscribe();
+      /* ── Comentarios de tareas (task_comments) ────────────── */
+      .on("postgres_changes",
+        { event: "*", schema: "public", table: "task_comments",
+          filter: `project_id=eq.${pid}` },
+        (payload) => {
+          const row = (payload.new ?? payload.old) as any;
+          if (!row?.id) return;
+          const taskId = row.task_id;
+          const myId = meRef.current?.id;
+
+          setCommentsByTask((prev) => {
+            const existing = prev[taskId];
+            // Solo reconciliamos si la tarea ya fue abierta (cargada).
+            if (existing === undefined) return prev;
+
+            if (payload.eventType === "DELETE") {
+              return { ...prev, [taskId]: existing.filter((c) => c.id !== row.id) };
+            }
+
+            const mapped: import("@/lib/types").TaskComment = {
+              id:           row.id,
+              taskId:       row.task_id,
+              userId:       row.user_id,
+              userName:     row.user_name,
+              userInitials: row.user_initials,
+              userColor:    row.user_color,
+              text:         row.text,
+              createdAt:    row.created_at,
+              isMe:         myId ? row.user_id === myId : false,
+            };
+
+            if (payload.eventType === "UPDATE") {
+              return {
+                ...prev,
+                [taskId]: existing.map((c) => (c.id === row.id ? mapped : c)),
+              };
+            }
+
+            // INSERT: idempotente por id; ignora si ya está (p.ej. el propio optimista)
+            if (existing.some((c) => c.id === row.id)) return prev;
+            return { ...prev, [taskId]: [...existing, mapped] };
+          });
+        }
+      )
+
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          // Resync tras (re)conexión para recuperar eventos perdidos.
+          loadProjectDataRef.current(activeProjectIdRef.current);
+        }
+      });
 
     return () => { supabase.removeChannel(channel); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
