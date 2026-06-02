@@ -14,6 +14,7 @@ import { RolesView }     from "@/components/views/RolesView";
 import { DocsView }      from "@/components/views/DocsView";
 import { BoardView }     from "@/components/views/BoardView";
 import { KanbanView }    from "@/components/views/KanbanView";
+import { TimelineView }  from "@/components/views/TimelineView";
 import { MyTasksView }   from "@/components/views/MyTasksView";
 import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
@@ -248,6 +249,8 @@ export function AppShell() {
                 done:        t.done,
                 order:       t.ord,
                 dueDate:     t.due_date   ?? null,
+                startDate:   t.start_date ?? null,
+                isMilestone: t.is_milestone ?? false,
                 priority:    t.priority   ?? "normal",
                 assignedTo:  t.assigned_to ?? null,
                 statusId:    t.status_id  ?? null,
@@ -1503,6 +1506,12 @@ export function AppShell() {
             onMoveTask={handleMoveTask}
             onSelectView={setActiveView}
           />
+        </div>
+      )}
+
+      {activeView === "timeline" && (
+        <div className="view-scroll">
+          <TimelineView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
         </div>
       )}
 

@@ -3635,3 +3635,114 @@ body {
   color: var(--text2);
   font-size: 14px;
 }
+
+/* ── Timeline / Gantt (tl-*) ── */
+.tl-wrap {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+.tl-zoom {
+  display: inline-flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--surface2);
+}
+.tl-zoom-btn {
+  background: transparent;
+  border: none;
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+.tl-zoom-btn:hover { color: var(--text); }
+.tl-zoom-btn.active {
+  background: var(--brand);
+  color: #fff;
+}
+.tl-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: var(--surface);
+}
+.tl-grid {
+  position: relative;
+  min-width: 100%;
+}
+.tl-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+.tl-label-col {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  width: 200px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+.tl-datehead {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--surface2);
+}
+.tl-datehead .tl-label-col {
+  z-index: 5;
+  background: var(--surface2);
+}
+.tl-module-header {
+  background: var(--surface3);
+}
+.tl-module-header .tl-label-col {
+  background: var(--surface3);
+}
+.tl-bar {
+  position: absolute;
+  top: 8px;
+  height: 16px;
+  border-radius: 5px;
+}
+.tl-milestone {
+  position: absolute;
+  top: 9px;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  transform: rotate(45deg);
+}
+.tl-today {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--brand);
+  z-index: 3;
+  pointer-events: none;
+}
+.tl-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--text2);
+  font-size: 14px;
+}
+.tl-footer {
+  flex-shrink: 0;
+  padding: 8px 24px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text3);
+  font-size: 12px;
+}

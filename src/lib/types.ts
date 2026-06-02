@@ -46,6 +46,8 @@ export interface NodeTask {
   done: boolean;
   order: number;
   dueDate?:    string | null;
+  startDate?:  string | null;
+  isMilestone?: boolean;
   priority?:   TaskPriority;
   alertStatus?: TaskAlertStatus;
   assignedTo?: string | null;
