@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type { Node } from "reactflow";
 import type { FunnelNodeData, ProjectMember, Project, TaskPriority, ProjectRole } from "@/lib/types";
 import { ROLE_LABELS, ROLE_COLORS, ALERT_COLORS, PRIORITY_COLORS } from "@/lib/constants";
@@ -24,6 +24,10 @@ interface BoardViewProps {
     assignedTo?: string | null; description?: string;
   }) => void;
   onSelectView: (view: string) => void;
+  commentsByTask:  Record<string, import("@/lib/types").TaskComment[]>;
+  loadingComments: Record<string, boolean>;
+  onLoadComments:  (taskId: string) => void;
+  onAddComment:    (taskId: string, text: string) => void;
 }
 
 function fmtDate(d: string) {
@@ -34,6 +38,7 @@ export function BoardView({
   project, nodes, members, me, myRole,
   onAddTask, onToggleTask, onDeleteTask, onSendMessage, onAddModule,
   onUpdateTask, onSelectView,
+  commentsByTask, loadingComments, onLoadComments, onAddComment,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
   const canDelete = myRole === "owner";
@@ -47,6 +52,10 @@ export function BoardView({
 
   const toggleCollapse = useCallback((id: string) =>
     setCollapsed((p) => ({ ...p, [id]: !p[id] })), []);
+
+  useEffect(() => {
+    if (selectedTask?.taskId) onLoadComments(selectedTask.taskId);
+  }, [selectedTask?.taskId, onLoadComments]);
 
   const clearAdd = () => { setAddingIn(null); setAddText(""); setAddDate(""); setAddPriority("normal"); };
 
@@ -297,6 +306,9 @@ export function BoardView({
             onToggle={() => onToggleTask(selNode.id, selTask.id)}
             onDelete={() => { onDeleteTask(selNode.id, selTask.id); setSelectedTask(null); }}
             onUpdate={(upd) => onUpdateTask(selNode.id, selTask.id, upd)}
+            comments={selTask ? (commentsByTask[selTask.id] ?? []) : []}
+            loadingComments={selTask ? (loadingComments[selTask.id] ?? false) : false}
+            onAddComment={(text) => selTask && onAddComment(selTask.id, text)}
           />
         )}
       </div>

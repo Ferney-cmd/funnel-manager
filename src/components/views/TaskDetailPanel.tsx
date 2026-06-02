@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { createClient } from "@/lib/supabase/client";
 import { getInitials, type Profile } from "@/lib/profiles";
 import { PRIORITY_COLORS, ALERT_COLORS } from "@/lib/constants";
 import { computeTaskAlertStatus } from "@/lib/types";
@@ -18,20 +17,20 @@ interface TaskDetailPanelProps {
   onToggle:    () => void;
   onDelete:    () => void;
   onUpdate:    (updates: { text?: string; dueDate?: string | null; priority?: TaskPriority; assignedTo?: string | null; description?: string }) => void;
+  comments:        TaskComment[];
+  loadingComments: boolean;
+  onAddComment:    (text: string) => void;
 }
 
 export function TaskDetailPanel({
   task, nodeTitle, nodeIcon, members, me,
   canEdit, onClose, onToggle, onDelete, onUpdate,
+  comments, loadingComments, onAddComment,
 }: TaskDetailPanelProps) {
-  const supabase = createClient();
-
   const [editingName, setEditingName]   = useState(false);
   const [nameVal,     setNameVal]       = useState(task.text);
   const [descVal,     setDescVal]       = useState(task.description ?? "");
-  const [comments,    setComments]      = useState<TaskComment[]>([]);
   const [commentText, setCommentText]   = useState("");
-  const [loadingCmts, setLoadingCmts]   = useState(true);
 
   const nameRef     = useRef<HTMLInputElement>(null);
   const chatEndRef  = useRef<HTMLDivElement>(null);
@@ -41,32 +40,6 @@ export function TaskDetailPanel({
     setNameVal(task.text);
     setDescVal(task.description ?? "");
   }, [task.id, task.text, task.description]);
-
-  /* load comments */
-  useEffect(() => {
-    setLoadingCmts(true);
-    supabase
-      .from("task_comments")
-      .select("*")
-      .eq("task_id", task.id)
-      .order("created_at", { ascending: true })
-      .then(({ data }) => {
-        const myId = me?.id;
-        setComments((data ?? []).map((c: any) => ({
-          id:           c.id,
-          taskId:       c.task_id,
-          userId:       c.user_id,
-          userName:     c.user_name,
-          userInitials: c.user_initials,
-          userColor:    c.user_color,
-          text:         c.text,
-          createdAt:    c.created_at,
-          isMe:         myId ? c.user_id === myId : false,
-        })));
-        setLoadingCmts(false);
-      });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task.id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -92,28 +65,10 @@ export function TaskDetailPanel({
     if (descVal !== (task.description ?? "")) onUpdate({ description: descVal });
   };
 
-  const submitComment = async () => {
-    if (!commentText.trim() || !me) return;
-    const id = crypto.randomUUID();
-    const c: TaskComment = {
-      id, taskId: task.id,
-      userId:       me.id,
-      userName:     me.full_name || me.email,
-      userInitials: getInitials(me.full_name || me.email),
-      userColor:    me.color,
-      text:         commentText.trim(),
-      createdAt:    new Date().toISOString(),
-      isMe:         true,
-    };
-    setComments((p) => [...p, c]);
+  const submitComment = () => {
+    if (!commentText.trim()) return;
+    onAddComment(commentText.trim());
     setCommentText("");
-    await supabase.from("task_comments").insert({
-      id, task_id: task.id, user_id: me.id,
-      user_name:    c.userName,
-      user_initials: c.userInitials,
-      user_color:   c.userColor,
-      text:         c.text,
-    });
   };
 
   const alert   = computeTaskAlertStatus(task);
@@ -287,7 +242,7 @@ export function TaskDetailPanel({
           </div>
 
           <div className="tdp-comments">
-            {loadingCmts ? (
+            {loadingComments ? (
               <div className="tdp-cmt-empty">Cargando…</div>
             ) : comments.length === 0 ? (
               <div className="tdp-cmt-empty">Sin comentarios todavía</div>

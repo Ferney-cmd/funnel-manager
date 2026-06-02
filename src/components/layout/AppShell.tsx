@@ -64,6 +64,8 @@ export function AppShell() {
   const [me,               setMe]               = useState<Profile | null>(null);
   const [membersByProject, setMembersByProject]  = useState<Record<string, ProjectMember[]>>({});
   const [onlineUsers,      setOnlineUsers]       = useState<string[]>([]);
+  const [commentsByTask,   setCommentsByTask]    = useState<Record<string, import("@/lib/types").TaskComment[]>>({});
+  const [loadingComments,  setLoadingComments]   = useState<Record<string, boolean>>({});
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
@@ -618,7 +620,10 @@ export function AppShell() {
       const task   = node?.data.tasks.find((t) => t.id === taskId);
       if (!task) return prev;
       const newDone = !task.done;
-      supabase.from("node_tasks").update({ done: newDone }).eq("id", taskId).then(() => {});
+      const snapshot = prev;
+      supabase.from("node_tasks").update({ done: newDone }).eq("id", taskId).then(({ error }) => {
+        if (error) { setNodesMap(snapshot); alert("No se pudo guardar: " + error.message); }
+      });
       return {
         ...prev,
         [activeProjectId]: nodes.map((n) =>
@@ -657,16 +662,21 @@ export function AppShell() {
 
   /* ── Delete task from node ──────────────────────────────────── */
   const handleDeleteTask = useCallback((nodeId: string, taskId: string) => {
-    supabase.from("node_tasks").delete().eq("id", taskId).then(() => {});
-    setNodesMap((prev) => ({
-      ...prev,
-      [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
-        n.id !== nodeId ? n : {
-          ...n,
-          data: { ...n.data, tasks: n.data.tasks.filter((t) => t.id !== taskId) },
-        }
-      ),
-    }));
+    setNodesMap((prev) => {
+      const snapshot = prev;
+      supabase.from("node_tasks").delete().eq("id", taskId).then(({ error }) => {
+        if (error) { setNodesMap(snapshot); alert("No se pudo guardar: " + error.message); }
+      });
+      return {
+        ...prev,
+        [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
+          n.id !== nodeId ? n : {
+            ...n,
+            data: { ...n.data, tasks: n.data.tasks.filter((t) => t.id !== taskId) },
+          }
+        ),
+      };
+    });
   }, [activeProjectId, supabase]);
 
   /* ── Add task to node ───────────────────────────────────────── */
@@ -675,27 +685,32 @@ export function AppShell() {
     const nodes  = nodesMap[activeProjectId] ?? [];
     const node   = nodes.find((n) => n.id === nodeId);
     const order  = node?.data.tasks.length ?? 0;
-    supabase.from("node_tasks").insert({
-      id: taskId, node_id: nodeId, text, done: false, ord: order,
-      due_date: dueDate   || null,
-      priority: priority  || "normal",
-    }).then(() => {});
-    setNodesMap((prev) => ({
-      ...prev,
-      [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
-        n.id !== nodeId ? n : {
-          ...n,
-          data: {
-            ...n.data,
-            tasks: [...n.data.tasks, {
-              id: taskId, text, done: false, order,
-              dueDate:  dueDate  ?? null,
-              priority: priority ?? "normal",
-            }],
-          },
-        }
-      ),
-    }));
+    setNodesMap((prev) => {
+      const snapshot = prev;
+      supabase.from("node_tasks").insert({
+        id: taskId, node_id: nodeId, text, done: false, ord: order,
+        due_date: dueDate   || null,
+        priority: priority  || "normal",
+      }).then(({ error }) => {
+        if (error) { setNodesMap(snapshot); alert("No se pudo guardar: " + error.message); }
+      });
+      return {
+        ...prev,
+        [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
+          n.id !== nodeId ? n : {
+            ...n,
+            data: {
+              ...n.data,
+              tasks: [...n.data.tasks, {
+                id: taskId, text, done: false, order,
+                dueDate:  dueDate  ?? null,
+                priority: priority ?? "normal",
+              }],
+            },
+          }
+        ),
+      };
+    });
   }, [activeProjectId, nodesMap, supabase]);
 
   /* ── Update task fields (text / dueDate / priority / assignedTo) ─── */
@@ -704,20 +719,24 @@ export function AppShell() {
     taskId: string,
     updates: { text?: string; dueDate?: string | null; priority?: TaskPriority; assignedTo?: string | null; description?: string }
   ) => {
-    setNodesMap((prev) => ({
-      ...prev,
-      [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
-        n.id !== nodeId ? n : {
-          ...n,
-          data: {
-            ...n.data,
-            tasks: n.data.tasks.map((t) =>
-              t.id !== taskId ? t : { ...t, ...updates }
-            ),
-          },
-        }
-      ),
-    }));
+    let snapshot: NodesMap = {};
+    setNodesMap((prev) => {
+      snapshot = prev;
+      return {
+        ...prev,
+        [activeProjectId]: (prev[activeProjectId] ?? []).map((n) =>
+          n.id !== nodeId ? n : {
+            ...n,
+            data: {
+              ...n.data,
+              tasks: n.data.tasks.map((t) =>
+                t.id !== taskId ? t : { ...t, ...updates }
+              ),
+            },
+          }
+        ),
+      };
+    });
     const db: Record<string, unknown> = {};
     if (updates.text        !== undefined) db.text        = updates.text;
     if (updates.dueDate     !== undefined) db.due_date    = updates.dueDate;
@@ -725,8 +744,59 @@ export function AppShell() {
     if (updates.assignedTo  !== undefined) db.assigned_to = updates.assignedTo;
     if (updates.description !== undefined) db.description = updates.description;
     if (Object.keys(db).length)
-      supabase.from("node_tasks").update(db).eq("id", taskId).then(() => {});
+      supabase.from("node_tasks").update(db).eq("id", taskId).then(({ error }) => {
+        if (error) { setNodesMap(snapshot); alert("No se pudo guardar: " + error.message); }
+      });
   }, [activeProjectId, supabase]);
+
+  /* ── Load comments for a task (lazy, once per task) ─────────── */
+  const handleLoadComments = useCallback((taskId: string) => {
+    setCommentsByTask((cur) => {
+      if (cur[taskId]) return cur; // ya cargado
+      setLoadingComments((p) => (p[taskId] ? p : { ...p, [taskId]: true }));
+      supabase
+        .from("task_comments")
+        .select("*")
+        .eq("task_id", taskId)
+        .order("created_at", { ascending: true })
+        .then(({ data }) => {
+          const myId = meRef.current?.id;
+          const mapped = (data ?? []).map((c: any) => ({
+            id: c.id, taskId: c.task_id, userId: c.user_id,
+            userName: c.user_name, userInitials: c.user_initials,
+            userColor: c.user_color, text: c.text, createdAt: c.created_at,
+            isMe: myId ? c.user_id === myId : false,
+          }));
+          setCommentsByTask((p) => ({ ...p, [taskId]: mapped }));
+          setLoadingComments((p) => ({ ...p, [taskId]: false }));
+        });
+      return cur;
+    });
+  }, [supabase]);
+
+  /* ── Add comment (optimistic + revert on error) ─────────────── */
+  const handleAddComment = useCallback((taskId: string, text: string) => {
+    if (!me || !text.trim()) return;
+    const id = `cmt-${uid()}`;
+    const optimistic: import("@/lib/types").TaskComment = {
+      id, taskId, userId: me.id,
+      userName: me.full_name || me.email,
+      userInitials: getInitials(me.full_name || me.email),
+      userColor: me.color, text: text.trim(),
+      createdAt: new Date().toISOString(), isMe: true,
+    };
+    setCommentsByTask((p) => ({ ...p, [taskId]: [...(p[taskId] ?? []), optimistic] }));
+    supabase.from("task_comments").insert({
+      id, task_id: taskId, user_id: me.id,
+      user_name: optimistic.userName, user_initials: optimistic.userInitials,
+      user_color: optimistic.userColor, text: optimistic.text,
+    }).then(({ error }) => {
+      if (error) {
+        setCommentsByTask((p) => ({ ...p, [taskId]: (p[taskId] ?? []).filter((c) => c.id !== id) }));
+        alert("No se pudo enviar el comentario: " + error.message);
+      }
+    });
+  }, [supabase, me]);
 
   /* ── Send text message ──────────────────────────────────────── */
   const handleSendMessage = useCallback((nodeId: string, text: string) => {
@@ -1287,6 +1357,10 @@ export function AppShell() {
             onAddModule={handleAddModule}
             onUpdateTask={handleUpdateTask}
             onSelectView={setActiveView}
+            commentsByTask={commentsByTask}
+            loadingComments={loadingComments}
+            onLoadComments={handleLoadComments}
+            onAddComment={handleAddComment}
           />
         </div>
       )}
