@@ -88,16 +88,18 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
   );
   const undatedCount = allFlat.length - dated.length;
 
-  /* Compute start/end Date per task. end = due ?? start; start = start ?? due. */
+  /* Compute start/end Date per task. end = due ?? start; start = start ?? due.
+     Se descartan fechas inválidas para no romper el cálculo del rango. */
   const ranges = useMemo(
     () =>
-      dated.map((ft) => {
+      dated.flatMap((ft) => {
         const endStr = ft.task.dueDate ?? ft.task.startDate!;
         const startStr = ft.task.startDate ?? ft.task.dueDate!;
         let start = parseDate(startStr);
         let end = parseDate(endStr);
+        if (isNaN(start.getTime()) || isNaN(end.getTime())) return [];
         if (end.getTime() < start.getTime()) [start, end] = [end, start];
-        return { ...ft, start, end };
+        return [{ ...ft, start, end }];
       }),
     [dated]
   );
@@ -140,7 +142,12 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
   }
 
   const { minDate, maxDate } = domain;
-  const totalDays = daysBetween(minDate, maxDate) + 1;
+  // Tope de seguridad: nunca renderizar más de MAX_DAYS columnas (evita
+  // congelar el navegador si una tarea tiene una fecha muy lejana/errónea).
+  const MAX_DAYS = 800;
+  const rawTotalDays = daysBetween(minDate, maxDate) + 1;
+  const clamped = rawTotalDays > MAX_DAYS;
+  const totalDays = Math.min(Math.max(rawTotalDays, 1), MAX_DAYS);
   const gridWidth = totalDays * dayWidth;
 
   /* Date ticks for the header. */
@@ -270,9 +277,16 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
         </div>
       </div>
 
-      {undatedCount > 0 && (
+      {(undatedCount > 0 || clamped) && (
         <div className="tl-footer">
-          {undatedCount} {undatedCount === 1 ? "tarea sin fecha" : "tareas sin fecha"} (no se muestran en el cronograma)
+          {undatedCount > 0 && (
+            <span>{undatedCount} {undatedCount === 1 ? "tarea sin fecha" : "tareas sin fecha"} (no se muestran en el cronograma)</span>
+          )}
+          {clamped && (
+            <span style={{ marginLeft: undatedCount > 0 ? 12 : 0, color: "#E24B4A" }}>
+              ⚠ El rango de fechas es muy amplio; se muestra una ventana de {MAX_DAYS} días. Revisa tareas con fechas muy lejanas.
+            </span>
+          )}
         </div>
       )}
     </div>

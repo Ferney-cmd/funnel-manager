@@ -78,10 +78,11 @@ export function AppShell() {
   useEffect(() => { meRef.current = me; }, [me]);
 
   /* ── Persistencia de UI efímera (último proyecto + pestaña) ──── */
-  // Restaura la última pestaña usada al montar
+  // Restaura la última pestaña usada al montar (solo vistas conocidas)
   useEffect(() => {
+    const KNOWN = ["canvas","board","kanban","timeline","mytasks","tablero","roles","docs","permisos","admin"];
     const v = typeof window !== "undefined" ? localStorage.getItem("fm_lastView") : null;
-    if (v) setActiveView(v);
+    if (v && KNOWN.includes(v)) setActiveView(v);
   }, []);
   // Guarda el proyecto activo y la pestaña cuando cambian
   useEffect(() => {
