@@ -24,6 +24,7 @@ interface SidebarProps {
 const BASE_VIEWS = [
   { id: "mytasks",  icon: "★",  label: "Mis Tareas" },
   { id: "portfolio",icon: "◫",  label: "Portafolio" },
+  { id: "workload", icon: "⚖",  label: "Carga equipo" },
   { id: "canvas",   icon: "◈",  label: "Embudo"    },
   { id: "board",    icon: "▦",  label: "Dashboard" },
   { id: "kanban",   icon: "▥",  label: "Kanban"    },
