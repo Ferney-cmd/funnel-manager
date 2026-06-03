@@ -27,6 +27,7 @@ const BASE_VIEWS = [
   { id: "board",    icon: "▦",  label: "Dashboard" },
   { id: "kanban",   icon: "▥",  label: "Kanban"    },
   { id: "timeline", icon: "▭",  label: "Cronograma" },
+  { id: "calendar", icon: "📅", label: "Calendario" },
   { id: "roles",    icon: "◎",  label: "Roles"     },
   { id: "docs",     icon: "⊟",  label: "Docs"      },
   { id: "tablero",  icon: "▤",  label: "Resumen"   },

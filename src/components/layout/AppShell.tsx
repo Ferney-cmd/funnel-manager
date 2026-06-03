@@ -15,6 +15,7 @@ import { DocsView }      from "@/components/views/DocsView";
 import { BoardView }     from "@/components/views/BoardView";
 import { KanbanView }    from "@/components/views/KanbanView";
 import { TimelineView }  from "@/components/views/TimelineView";
+import { CalendarView }  from "@/components/views/CalendarView";
 import { MyTasksView }   from "@/components/views/MyTasksView";
 import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
@@ -80,7 +81,7 @@ export function AppShell() {
   /* ── Persistencia de UI efímera (último proyecto + pestaña) ──── */
   // Restaura la última pestaña usada al montar (solo vistas conocidas)
   useEffect(() => {
-    const KNOWN = ["canvas","board","kanban","timeline","mytasks","tablero","roles","docs","permisos","admin"];
+    const KNOWN = ["canvas","board","kanban","timeline","calendar","mytasks","tablero","roles","docs","permisos","admin"];
     const v = typeof window !== "undefined" ? localStorage.getItem("fm_lastView") : null;
     if (v && KNOWN.includes(v)) setActiveView(v);
   }, []);
@@ -1513,6 +1514,12 @@ export function AppShell() {
       {activeView === "timeline" && (
         <div className="view-scroll">
           <TimelineView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
+        </div>
+      )}
+
+      {activeView === "calendar" && (
+        <div className="view-scroll">
+          <CalendarView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
         </div>
       )}
 
