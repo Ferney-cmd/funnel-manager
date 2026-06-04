@@ -2587,6 +2587,30 @@ body {
 .al-col-priority  { display: flex; align-items: center; }
 .al-col-status    { display: flex; align-items: center; }
 
+/* ── Vertical column dividers (header + task rows) ── */
+.al-col-headers > .al-col-assignee,
+.al-col-headers > .al-col-date,
+.al-col-headers > .al-col-priority,
+.al-col-headers > .al-col-status,
+.al-task-row > .al-col-assignee,
+.al-task-row > .al-col-date,
+.al-task-row > .al-col-priority,
+.al-task-row > .al-col-status {
+  border-left: 1px solid var(--border);
+  padding-left: 10px;
+}
+/* dividers span the full row height */
+.al-task-row > .al-col-assignee,
+.al-task-row > .al-col-date,
+.al-task-row > .al-col-priority,
+.al-task-row > .al-col-status {
+  align-self: stretch;
+}
+.al-col-headers > .al-col-status,
+.al-task-row > .al-col-status {
+  border-right: 1px solid var(--border);
+}
+
 /* ── Body — split pane ── */
 .al-body {
   display: grid;
@@ -2650,6 +2674,20 @@ body {
 
 .al-section-icon  { font-size: 16px; flex-shrink: 0; }
 .al-section-name  { font-size: 13px; font-weight: 700; color: var(--text); }
+.al-section-name.editable { cursor: text; border-radius: 4px; padding: 1px 4px; margin: -1px -4px; transition: background .12s; }
+.al-section-name.editable:hover { background: var(--surface2); }
+.al-section-name-input {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--brand);
+  border-radius: 4px;
+  padding: 1px 4px;
+  outline: none;
+  font-family: inherit;
+  max-width: 280px;
+}
 .al-section-role  { font-size: 11px; font-weight: 500; }
 .al-section-count { font-size: 11px; color: var(--text3); margin-left: auto; }
 

@@ -29,6 +29,7 @@ interface BoardViewProps {
   loadingComments: Record<string, boolean>;
   onLoadComments:  (taskId: string) => void;
   onAddComment:    (taskId: string, text: string) => void;
+  onRenameSection: (nodeId: string, title: string) => void;
 }
 
 function fmtDate(d: string) {
@@ -46,6 +47,7 @@ export function BoardView({
   onAddTask, onToggleTask, onDeleteTask, onSendMessage, onAddModule,
   onUpdateTask, onMoveTaskToNode, onSelectView,
   commentsByTask, loadingComments, onLoadComments, onAddComment,
+  onRenameSection,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
   const canDelete = myRole === "owner";
@@ -60,6 +62,10 @@ export function BoardView({
   /* ── Inline name editing ── */
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editText,      setEditText]      = useState("");
+
+  /* ── Inline section (module) name editing ── */
+  const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
+  const [sectionText,      setSectionText]      = useState("");
 
   /* ── Drag & drop (reorder / move tasks; module mode only) ── */
   const dragRef = useRef<{ taskId: string; fromNodeId: string } | null>(null);
@@ -188,6 +194,17 @@ export function BoardView({
     const next = editText.trim();
     if (next && next !== task.text) onUpdateTask(nodeId, task.id, { text: next });
     cancelEdit();
+  };
+
+  /* ── Inline section-name edit handlers ── */
+  const startSectionEdit = (nodeId: string, title: string) => {
+    setEditingSectionId(nodeId); setSectionText(title);
+  };
+  const cancelSectionEdit = () => { setEditingSectionId(null); setSectionText(""); };
+  const commitSectionEdit = (nodeId: string, currentTitle: string) => {
+    const next = sectionText.trim();
+    if (next && next !== currentTitle) onRenameSection(nodeId, next);
+    cancelSectionEdit();
   };
 
   /* ── Sorting helper ── */
@@ -626,7 +643,29 @@ export function BoardView({
                       {isCol ? "▸" : "▾"}
                     </button>
                     <span className="al-section-icon">{n.data.icon}</span>
-                    <span className="al-section-name">{n.data.title}</span>
+                    {editingSectionId === n.id ? (
+                      <input
+                        autoFocus
+                        type="text"
+                        className="al-section-name-input"
+                        value={sectionText}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={(e) => setSectionText(e.target.value)}
+                        onBlur={() => commitSectionEdit(n.id, n.data.title)}
+                        onKeyDown={(e) => {
+                          e.stopPropagation();
+                          if (e.key === "Enter") commitSectionEdit(n.id, n.data.title);
+                          if (e.key === "Escape") cancelSectionEdit();
+                        }}
+                      />
+                    ) : (
+                      <span
+                        className={`al-section-name${canEdit ? " editable" : ""}`}
+                        onClick={canEdit ? (e) => { e.stopPropagation(); startSectionEdit(n.id, n.data.title); } : undefined}
+                      >
+                        {n.data.title}
+                      </span>
+                    )}
                     <span className="al-section-role" style={{ color: roleColor }}>
                       {ROLE_LABELS[n.data.role] ?? n.data.role}
                     </span>
