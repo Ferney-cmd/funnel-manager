@@ -50,8 +50,79 @@ export function BoardView({
   const [addDate,      setAddDate]     = useState("");
   const [addPriority,  setAddPriority] = useState<TaskPriority>("normal");
 
+  /* ── AI task generation (one section at a time) ── */
+  type AiSuggestion = { text: string; priority: TaskPriority };
+  const [aiNodeId,      setAiNodeId]      = useState<string | null>(null);
+  const [aiPrompt,      setAiPrompt]      = useState("");
+  const [aiLoading,     setAiLoading]     = useState(false);
+  const [aiSuggestions, setAiSuggestions] = useState<AiSuggestion[]>([]);
+  const [aiChecked,     setAiChecked]     = useState<boolean[]>([]);
+  const [aiError,       setAiError]       = useState("");
+
   const toggleCollapse = useCallback((id: string) =>
     setCollapsed((p) => ({ ...p, [id]: !p[id] })), []);
+
+  const clearAi = () => {
+    setAiNodeId(null); setAiPrompt(""); setAiLoading(false);
+    setAiSuggestions([]); setAiChecked([]); setAiError("");
+  };
+
+  const openAi = (nodeId: string) => {
+    clearAdd();
+    setAddingIn(null);
+    setAiNodeId(nodeId); setAiPrompt(""); setAiLoading(false);
+    setAiSuggestions([]); setAiChecked([]); setAiError("");
+  };
+
+  const generateAi = async (node: Node<FunnelNodeData>) => {
+    if (!aiPrompt.trim() || aiLoading) return;
+    setAiLoading(true); setAiError(""); setAiSuggestions([]); setAiChecked([]);
+    try {
+      const res = await fetch("/api/ai/tasks", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          prompt: aiPrompt,
+          context: {
+            nodeTitle: node.data.title,
+            role: node.data.role,
+            existingTasks: node.data.tasks.map((t) => t.text),
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data?.error === "AI_NOT_CONFIGURED") {
+        setAiError("⚠ La IA no está configurada. Pídele al administrador configurar la API key.");
+      } else if (data?.error || !Array.isArray(data?.tasks)) {
+        setAiError("No se pudo generar. Intenta de nuevo.");
+      } else {
+        const valid = ["low", "normal", "high", "urgent"];
+        const sugg: AiSuggestion[] = data.tasks
+          .filter((t: any) => t && typeof t.text === "string" && t.text.trim())
+          .map((t: any) => ({
+            text: String(t.text),
+            priority: (valid.includes(t.priority) ? t.priority : "normal") as TaskPriority,
+          }));
+        if (sugg.length === 0) {
+          setAiError("No se pudo generar. Intenta de nuevo.");
+        } else {
+          setAiSuggestions(sugg);
+          setAiChecked(sugg.map(() => true));
+        }
+      }
+    } catch {
+      setAiError("No se pudo generar. Intenta de nuevo.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const addAiSelected = (nodeId: string) => {
+    aiSuggestions.forEach((s, i) => {
+      if (aiChecked[i]) onAddTask(nodeId, s.text, undefined, s.priority);
+    });
+    clearAi();
+  };
 
   useEffect(() => {
     if (selectedTask?.taskId) onLoadComments(selectedTask.taskId);
@@ -157,10 +228,90 @@ export function BoardView({
                       + Tarea
                     </button>
                   )}
+                  {canEdit && (
+                    <button
+                      className="ai-trigger-btn"
+                      onClick={() => openAi(n.id)}
+                      title="Generar tareas con IA"
+                    >
+                      ✨ IA
+                    </button>
+                  )}
                 </div>
 
                 {!isCol && (
                   <>
+                    {/* ── AI composer ── */}
+                    {aiNodeId === n.id && (
+                      <div className="ai-composer">
+                        <div className="ai-composer-row">
+                          <input
+                            autoFocus
+                            type="text"
+                            className="ai-input"
+                            placeholder="Describe qué tareas necesitas… ej: 5 tareas para configurar el dominio"
+                            value={aiPrompt}
+                            disabled={aiLoading}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") generateAi(n);
+                              if (e.key === "Escape") clearAi();
+                            }}
+                          />
+                          <button
+                            className="ai-generate-btn"
+                            onClick={() => generateAi(n)}
+                            disabled={aiLoading || !aiPrompt.trim()}
+                          >
+                            {aiLoading ? "Generando…" : "Generar"}
+                          </button>
+                          <button className="ai-cancel-btn" onClick={clearAi} title="Cerrar">✕</button>
+                        </div>
+
+                        {aiError && <div className="ai-error">{aiError}</div>}
+
+                        {aiSuggestions.length > 0 && (
+                          <>
+                            <div className="ai-suggestions">
+                              {aiSuggestions.map((s, i) => {
+                                const pc = PRIORITY_COLORS[s.priority];
+                                return (
+                                  <label key={i} className="ai-suggestion-row">
+                                    <input
+                                      type="checkbox"
+                                      className="ai-checkbox"
+                                      checked={aiChecked[i] ?? false}
+                                      onChange={(e) =>
+                                        setAiChecked((prev) => {
+                                          const next = [...prev];
+                                          next[i] = e.target.checked;
+                                          return next;
+                                        })
+                                      }
+                                    />
+                                    <span className="ai-suggestion-text">{s.text}</span>
+                                    <span className="ai-chip" style={{ background: pc.bg, color: pc.fg }}>
+                                      {pc.label}
+                                    </span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                            <div className="ai-composer-actions">
+                              <button
+                                className="ai-add-btn"
+                                onClick={() => addAiSelected(n.id)}
+                                disabled={!aiChecked.some(Boolean)}
+                              >
+                                Agregar seleccionadas
+                              </button>
+                              <button className="ai-discard-btn" onClick={clearAi}>Descartar</button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     {/* Task rows */}
                     {n.data.tasks.map((t) => {
                       const alert    = computeTaskAlertStatus(t);
