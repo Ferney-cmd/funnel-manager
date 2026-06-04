@@ -1552,6 +1552,7 @@ export function AppShell() {
             onLoadComments={handleLoadComments}
             onAddComment={handleAddComment}
             onRenameSection={(nodeId, title) => handleUpdateNodeData(nodeId, { title })}
+            onSetSectionRole={(nodeId, role) => handleUpdateNodeData(nodeId, { role })}
           />
         </div>
       )}

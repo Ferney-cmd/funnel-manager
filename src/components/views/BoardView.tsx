@@ -30,6 +30,7 @@ interface BoardViewProps {
   onLoadComments:  (taskId: string) => void;
   onAddComment:    (taskId: string, text: string) => void;
   onRenameSection: (nodeId: string, title: string) => void;
+  onSetSectionRole: (nodeId: string, role: string) => void;
 }
 
 function fmtDate(d: string) {
@@ -47,7 +48,7 @@ export function BoardView({
   onAddTask, onToggleTask, onDeleteTask, onSendMessage, onAddModule,
   onUpdateTask, onMoveTaskToNode, onSelectView,
   commentsByTask, loadingComments, onLoadComments, onAddComment,
-  onRenameSection,
+  onRenameSection, onSetSectionRole,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
   const canDelete = myRole === "owner";
@@ -66,6 +67,10 @@ export function BoardView({
   /* ── Inline section (module) name editing ── */
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null);
   const [sectionText,      setSectionText]      = useState("");
+
+  /* ── Section role dropdown ── */
+  const [roleMenuNodeId, setRoleMenuNodeId] = useState<string | null>(null);
+  const roleMenuRef = useRef<HTMLDivElement>(null);
 
   /* ── Drag & drop (reorder / move tasks; module mode only) ── */
   const dragRef = useRef<{ taskId: string; fromNodeId: string } | null>(null);
@@ -97,6 +102,16 @@ export function BoardView({
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [openPopover]);
+
+  /* close section role dropdown on outside click */
+  useEffect(() => {
+    if (!roleMenuNodeId) return;
+    const onDoc = (e: MouseEvent) => {
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as globalThis.Node)) setRoleMenuNodeId(null);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [roleMenuNodeId]);
 
   const filtersActive = filterAssignee !== "" || filterPriority !== "";
   const clearFilters = () => { setFilterAssignee(""); setFilterPriority(""); };
@@ -666,9 +681,45 @@ export function BoardView({
                         {n.data.title}
                       </span>
                     )}
-                    <span className="al-section-role" style={{ color: roleColor }}>
-                      {ROLE_LABELS[n.data.role] ?? n.data.role}
-                    </span>
+                    {canEdit ? (
+                      <span style={{ position: "relative" }} onClick={(e) => e.stopPropagation()}>
+                        <button
+                          className="al-role-chip"
+                          style={{ color: roleColor }}
+                          title="Cambiar rol"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRoleMenuNodeId((cur) => (cur === n.id ? null : n.id));
+                          }}
+                        >
+                          <span className="al-role-dot" style={{ background: roleColor }} />
+                          {ROLE_LABELS[n.data.role] ?? n.data.role}
+                          <span style={{ fontSize: 8 }}>▾</span>
+                        </button>
+                        {roleMenuNodeId === n.id && (
+                          <div className="al-role-dropdown" ref={roleMenuRef} onClick={(e) => e.stopPropagation()}>
+                            {Object.keys(ROLE_LABELS).map((roleKey) => (
+                              <button
+                                key={roleKey}
+                                className="al-role-option"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSetSectionRole(n.id, roleKey);
+                                  setRoleMenuNodeId(null);
+                                }}
+                              >
+                                <span className="al-role-dot" style={{ background: ROLE_COLORS[roleKey] ?? "#7C3AED" }} />
+                                {ROLE_LABELS[roleKey]}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </span>
+                    ) : (
+                      <span className="al-section-role" style={{ color: roleColor }}>
+                        {ROLE_LABELS[n.data.role] ?? n.data.role}
+                      </span>
+                    )}
                     <span className="al-section-count">
                       {doneCnt}/{n.data.tasks.length}
                     </span>

@@ -6,6 +6,10 @@ export const ROLE_COLORS: Record<string, string> = {
   ventas:        "#E24B4A",
   pm:            "#F59E0B",
   experto:       "#8B5CF6",
+  creativos:     "#EC4899",
+  closer:        "#0EA5E9",
+  setter:        "#14B8A6",
+  tech:          "#64748B",
 };
 
 export const ROLE_LABELS: Record<string, string> = {
@@ -16,6 +20,10 @@ export const ROLE_LABELS: Record<string, string> = {
   ventas:        "Líder de Ventas",
   pm:            "Project Manager",
   experto:       "Experto / CEO",
+  creativos:     "Diseño / Creativos",
+  closer:        "Closer",
+  setter:        "Setter",
+  tech:          "Tech / Soporte",
 };
 
 export const PROJECT_STATUSES = {
@@ -143,4 +151,8 @@ export const TASK_SUGGESTIONS: Record<string, string[]> = {
     "Estrategia de bonos",
     "Definir garantía",
   ],
+  creativos: [],
+  closer: [],
+  setter: [],
+  tech: [],
 };

@@ -15,6 +15,10 @@ const ROLE_COLOR_MAP: Record<string, string> = {
   ventas:        "#E24B4A",
   pm:            "#F59E0B",
   experto:       "#8B5CF6",
+  creativos:     "#EC4899",
+  closer:        "#0EA5E9",
+  setter:        "#14B8A6",
+  tech:          "#64748B",
 };
 
 const ROLE_ICONS: Record<string, string> = {
@@ -25,6 +29,10 @@ const ROLE_ICONS: Record<string, string> = {
   ventas:        "💰",
   pm:            "📋",
   experto:       "🎯",
+  creativos:     "🎨",
+  closer:        "🤝",
+  setter:        "📞",
+  tech:          "🛠️",
 };
 
 function getRoleColor(role: string) { return ROLE_COLOR_MAP[role] ?? "#7C3AED"; }
