@@ -2681,6 +2681,17 @@ body {
 .al-task-row.active     { background: #7C3AED12; border-left: 3px solid var(--brand); padding-left: 21px; }
 .al-task-row.done       { opacity: .65; }
 
+/* ── List view drag & drop ── */
+.al-task-row[draggable="true"] { cursor: grab; }
+.al-task-row.dragging   { opacity: .5; }
+.al-drop-indicator {
+  height: 2px;
+  background: var(--brand);
+  margin: 0 12px;
+  border-radius: 2px;
+}
+.al-section-body { min-height: 4px; }
+
 /* ── Checkbox ── */
 .al-check {
   width: 16px;

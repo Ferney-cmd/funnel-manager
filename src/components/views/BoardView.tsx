@@ -23,6 +23,7 @@ interface BoardViewProps {
     text?: string; dueDate?: string | null; priority?: TaskPriority;
     assignedTo?: string | null; description?: string;
   }) => void;
+  onMoveTaskToNode: (taskId: string, fromNodeId: string, toNodeId: string, targetIndex: number) => void;
   onSelectView: (view: string) => void;
   commentsByTask:  Record<string, import("@/lib/types").TaskComment[]>;
   loadingComments: Record<string, boolean>;
@@ -43,7 +44,7 @@ const PRIORITY_RANK: Record<TaskPriority, number> = { urgent: 0, high: 1, normal
 export function BoardView({
   project, nodes, members, me, myRole,
   onAddTask, onToggleTask, onDeleteTask, onSendMessage, onAddModule,
-  onUpdateTask, onSelectView,
+  onUpdateTask, onMoveTaskToNode, onSelectView,
   commentsByTask, loadingComments, onLoadComments, onAddComment,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
@@ -59,6 +60,17 @@ export function BoardView({
   /* ── Inline name editing ── */
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editText,      setEditText]      = useState("");
+
+  /* ── Drag & drop (reorder / move tasks; module mode only) ── */
+  const dragRef = useRef<{ taskId: string; fromNodeId: string } | null>(null);
+  const [draggingId,   setDraggingId]   = useState<string | null>(null);
+  const [dropIndicator, setDropIndicator] = useState<{ nodeId: string; index: number } | null>(null);
+
+  const clearDrag = useCallback(() => {
+    dragRef.current = null;
+    setDraggingId(null);
+    setDropIndicator(null);
+  }, []);
 
   /* ── Toolbar state ── */
   const [filterAssignee, setFilterAssignee] = useState<string>("");   // "" all, "none" sin asignar, else member id
@@ -287,20 +299,61 @@ export function BoardView({
 
   const panelOpen = !!selTask;
 
-  /* ── Reusable task row ── */
-  const renderTaskRow = (t: NodeTask, node: Node<FunnelNodeData>) => {
+  /* ── Reusable task row ──
+     dndIndex: visual index within the section. When provided (module mode + canEdit)
+     the row becomes draggable and a drop target. */
+  const renderTaskRow = (t: NodeTask, node: Node<FunnelNodeData>, dndIndex?: number) => {
     const alert    = computeTaskAlertStatus(t);
     const ac       = ALERT_COLORS[alert];
     const pc       = PRIORITY_COLORS[t.priority ?? "normal"];
     const assignee = members.find((m) => m.id === t.assignedTo);
     const isActive = selectedTask?.taskId === t.id;
     const isEditing = editingTaskId === t.id;
+    const dndOn     = canEdit && groupBy === "module" && sortBy === "manual" && dndIndex !== undefined && !isEditing;
+
+    const showIndicatorBefore =
+      dndOn && dropIndicator?.nodeId === node.id && dropIndicator.index === dndIndex;
 
     return (
+      <div key={`wrap:${node.id}:${t.id}`}>
+        {showIndicatorBefore && <div className="al-drop-indicator" />}
       <div
         key={`${node.id}:${t.id}`}
-        className={`al-task-row${t.done ? " done" : ""}${isActive ? " active" : ""}`}
+        draggable={dndOn}
+        className={`al-task-row${t.done ? " done" : ""}${isActive ? " active" : ""}${draggingId === t.id ? " dragging" : ""}`}
         onClick={() => { if (!isEditing) setSelectedTask({ nodeId: node.id, taskId: t.id }); }}
+        onDragStart={dndOn ? (e) => {
+          dragRef.current = { taskId: t.id, fromNodeId: node.id };
+          e.dataTransfer.effectAllowed = "move";
+          try { e.dataTransfer.setData("text/plain", t.id); } catch {}
+          setDraggingId(t.id);
+        } : undefined}
+        onDragOver={dndOn ? (e) => {
+          if (!dragRef.current) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = "move";
+          const rect = e.currentTarget.getBoundingClientRect();
+          const after = e.clientY - rect.top > rect.height / 2;
+          const idx = after ? dndIndex! + 1 : dndIndex!;
+          setDropIndicator((cur) =>
+            cur && cur.nodeId === node.id && cur.index === idx ? cur : { nodeId: node.id, index: idx }
+          );
+        } : undefined}
+        onDrop={dndOn ? (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const drag = dragRef.current;
+          if (!drag) { clearDrag(); return; }
+          const rect = e.currentTarget.getBoundingClientRect();
+          const after = e.clientY - rect.top > rect.height / 2;
+          const idx = after ? dndIndex! + 1 : dndIndex!;
+          if (!(drag.taskId === t.id)) {
+            onMoveTaskToNode(drag.taskId, drag.fromNodeId, node.id, idx);
+          }
+          clearDrag();
+        } : undefined}
+        onDragEnd={dndOn ? clearDrag : undefined}
       >
         {/* checkbox */}
         <button
@@ -385,6 +438,7 @@ export function BoardView({
             <span style={{ fontSize: 11, color: "#10B981" }}>✓ Hecha</span>
           )}
         </div>
+      </div>
       </div>
     );
   };
@@ -672,8 +726,42 @@ export function BoardView({
                         </div>
                       )}
 
-                      {/* Task rows */}
-                      {visibleTasks.map((t) => renderTaskRow(t, n))}
+                      {/* Task rows (drop target wrapper for reorder / move) */}
+                      {(() => {
+                        const dndActive = canEdit && groupBy === "module" && sortBy === "manual";
+                        return (
+                          <div
+                            className="al-section-body"
+                            onDragOver={dndActive ? (e) => {
+                              if (!dragRef.current) return;
+                              e.preventDefault();
+                              e.dataTransfer.dropEffect = "move";
+                              // Only set "append" indicator when not hovering a specific row.
+                              if (e.target === e.currentTarget) {
+                                const idx = visibleTasks.length;
+                                setDropIndicator((cur) =>
+                                  cur && cur.nodeId === n.id && cur.index === idx ? cur : { nodeId: n.id, index: idx }
+                                );
+                              }
+                            } : undefined}
+                            onDrop={dndActive ? (e) => {
+                              if (!dragRef.current) { clearDrag(); return; }
+                              // Only handle drops that landed on the body itself (rows handle their own).
+                              if (e.target !== e.currentTarget) return;
+                              e.preventDefault();
+                              const drag = dragRef.current;
+                              onMoveTaskToNode(drag.taskId, drag.fromNodeId, n.id, visibleTasks.length);
+                              clearDrag();
+                            } : undefined}
+                          >
+                            {visibleTasks.map((t, i) => renderTaskRow(t, n, i))}
+                            {/* trailing drop indicator (append position) */}
+                            {dndActive && dropIndicator?.nodeId === n.id && dropIndicator.index === visibleTasks.length && (
+                              <div className="al-drop-indicator" />
+                            )}
+                          </div>
+                        );
+                      })()}
 
                       {/* Inline add task */}
                       {addingIn === n.id ? (

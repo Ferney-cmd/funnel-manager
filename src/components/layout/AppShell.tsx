@@ -879,6 +879,64 @@ export function AppShell() {
     });
   }, [activeProjectId, supabase]);
 
+  /* ── Move task within / between nodes (List view DnD) ───────── */
+  const handleMoveTaskToNode = useCallback((taskId: string, fromNodeId: string, toNodeId: string, targetIndex: number) => {
+    let snapshot: NodesMap | null = null;
+    setNodesMap((prev) => {
+      snapshot = prev;
+      const nodes = prev[activeProjectId] ?? [];
+      const fromNode = nodes.find((n) => n.id === fromNodeId);
+      const moving = fromNode?.data.tasks.find((t) => t.id === taskId);
+      if (!moving) return prev;
+
+      const next = nodes.map((n) => {
+        if (n.id === fromNodeId && fromNodeId === toNodeId) {
+          // reorder within same node
+          const without = n.data.tasks.filter((t) => t.id !== taskId);
+          const idx = Math.max(0, Math.min(targetIndex, without.length));
+          without.splice(idx, 0, moving);
+          return { ...n, data: { ...n.data, tasks: without.map((t, i) => ({ ...t, order: i })) } };
+        }
+        if (n.id === fromNodeId) {
+          return { ...n, data: { ...n.data, tasks: n.data.tasks.filter((t) => t.id !== taskId).map((t, i) => ({ ...t, order: i })) } };
+        }
+        if (n.id === toNodeId) {
+          const arr = n.data.tasks.slice();
+          const idx = Math.max(0, Math.min(targetIndex, arr.length));
+          arr.splice(idx, 0, { ...moving });
+          return { ...n, data: { ...n.data, tasks: arr.map((t, i) => ({ ...t, order: i })) } };
+        }
+        return n;
+      });
+      return { ...prev, [activeProjectId]: next };
+    });
+
+    // Persist: move node_id if changed, then re-sequence ord of affected node(s).
+    (async () => {
+      try {
+        if (fromNodeId !== toNodeId) {
+          const { error } = await supabase.from("node_tasks").update({ node_id: toNodeId }).eq("id", taskId);
+          if (error) throw error;
+        }
+        // Re-number ord for the affected nodes based on the new optimistic state.
+        const affected = fromNodeId === toNodeId ? [toNodeId] : [fromNodeId, toNodeId];
+        let latest: NodesMap = {};
+        setNodesMap((cur) => { latest = cur; return cur; });
+        const nodes = latest[activeProjectId] ?? [];
+        for (const nid of affected) {
+          const nn = nodes.find((n) => n.id === nid);
+          if (!nn) continue;
+          await Promise.all(nn.data.tasks.map((t, i) =>
+            supabase.from("node_tasks").update({ ord: i }).eq("id", t.id)
+          ));
+        }
+      } catch (e: any) {
+        if (snapshot) setNodesMap(snapshot);
+        alert("No se pudo mover la tarea: " + (e?.message ?? e));
+      }
+    })();
+  }, [activeProjectId, supabase]);
+
   /* ── Load comments for a task (lazy, once per task) ─────────── */
   const handleLoadComments = useCallback((taskId: string) => {
     setCommentsByTask((cur) => {
@@ -1487,6 +1545,7 @@ export function AppShell() {
             onSendMessage={handleSendMessage}
             onAddModule={handleAddModule}
             onUpdateTask={handleUpdateTask}
+            onMoveTaskToNode={handleMoveTaskToNode}
             onSelectView={setActiveView}
             commentsByTask={commentsByTask}
             loadingComments={loadingComments}
