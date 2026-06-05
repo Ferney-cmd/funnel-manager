@@ -70,7 +70,17 @@ export function BoardView({
 
   /* ── Section role dropdown ── */
   const [roleMenuNodeId, setRoleMenuNodeId] = useState<string | null>(null);
+  const [roleMenuPos,    setRoleMenuPos]    = useState<{ top: number; left: number } | null>(null);
+  const [roleCustomMode, setRoleCustomMode] = useState<boolean>(false);
+  const [roleCustomText, setRoleCustomText] = useState<string>("");
   const roleMenuRef = useRef<HTMLDivElement>(null);
+
+  const closeRoleMenu = useCallback(() => {
+    setRoleMenuNodeId(null);
+    setRoleMenuPos(null);
+    setRoleCustomMode(false);
+    setRoleCustomText("");
+  }, []);
 
   /* ── Drag & drop (reorder / move tasks; module mode only) ── */
   const dragRef = useRef<{ taskId: string; fromNodeId: string } | null>(null);
@@ -103,15 +113,20 @@ export function BoardView({
     return () => document.removeEventListener("mousedown", onDoc);
   }, [openPopover]);
 
-  /* close section role dropdown on outside click */
+  /* close section role dropdown on outside click or scroll */
   useEffect(() => {
     if (!roleMenuNodeId) return;
     const onDoc = (e: MouseEvent) => {
-      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as globalThis.Node)) setRoleMenuNodeId(null);
+      if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as globalThis.Node)) closeRoleMenu();
     };
+    const onScroll = () => closeRoleMenu();
     document.addEventListener("mousedown", onDoc);
-    return () => document.removeEventListener("mousedown", onDoc);
-  }, [roleMenuNodeId]);
+    window.addEventListener("scroll", onScroll, true);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      window.removeEventListener("scroll", onScroll, true);
+    };
+  }, [roleMenuNodeId, closeRoleMenu]);
 
   const filtersActive = filterAssignee !== "" || filterPriority !== "";
   const clearFilters = () => { setFilterAssignee(""); setFilterPriority(""); };
@@ -689,29 +704,84 @@ export function BoardView({
                           title="Cambiar rol"
                           onClick={(e) => {
                             e.stopPropagation();
-                            setRoleMenuNodeId((cur) => (cur === n.id ? null : n.id));
+                            if (roleMenuNodeId === n.id) {
+                              closeRoleMenu();
+                            } else {
+                              const rect = e.currentTarget.getBoundingClientRect();
+                              setRoleMenuPos({ top: rect.bottom + 4, left: rect.left });
+                              setRoleCustomMode(false);
+                              setRoleCustomText("");
+                              setRoleMenuNodeId(n.id);
+                            }
                           }}
                         >
                           <span className="al-role-dot" style={{ background: roleColor }} />
                           {ROLE_LABELS[n.data.role] ?? n.data.role}
                           <span style={{ fontSize: 8 }}>▾</span>
                         </button>
-                        {roleMenuNodeId === n.id && (
-                          <div className="al-role-dropdown" ref={roleMenuRef} onClick={(e) => e.stopPropagation()}>
-                            {Object.keys(ROLE_LABELS).map((roleKey) => (
-                              <button
-                                key={roleKey}
-                                className="al-role-option"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onSetSectionRole(n.id, roleKey);
-                                  setRoleMenuNodeId(null);
-                                }}
-                              >
-                                <span className="al-role-dot" style={{ background: ROLE_COLORS[roleKey] ?? "#7C3AED" }} />
-                                {ROLE_LABELS[roleKey]}
-                              </button>
-                            ))}
+                        {roleMenuNodeId === n.id && roleMenuPos && (
+                          <div
+                            className="al-role-dropdown"
+                            ref={roleMenuRef}
+                            style={{ top: roleMenuPos.top, left: roleMenuPos.left }}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {roleCustomMode ? (
+                              <div className="al-role-custom">
+                                <input
+                                  autoFocus
+                                  type="text"
+                                  placeholder="Nombre del rol…"
+                                  value={roleCustomText}
+                                  onChange={(e) => setRoleCustomText(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    e.stopPropagation();
+                                    if (e.key === "Enter") {
+                                      const v = roleCustomText.trim();
+                                      if (v) { onSetSectionRole(n.id, v); closeRoleMenu(); }
+                                    }
+                                    if (e.key === "Escape") { setRoleCustomMode(false); setRoleCustomText(""); }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const v = roleCustomText.trim();
+                                    if (v) { onSetSectionRole(n.id, v); closeRoleMenu(); }
+                                  }}
+                                >
+                                  Guardar
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {Object.keys(ROLE_LABELS).map((roleKey) => (
+                                  <button
+                                    key={roleKey}
+                                    className="al-role-option"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onSetSectionRole(n.id, roleKey);
+                                      closeRoleMenu();
+                                    }}
+                                  >
+                                    <span className="al-role-dot" style={{ background: ROLE_COLORS[roleKey] ?? "#7C3AED" }} />
+                                    {ROLE_LABELS[roleKey]}
+                                  </button>
+                                ))}
+                                <button
+                                  className="al-role-option"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setRoleCustomText("");
+                                    setRoleCustomMode(true);
+                                  }}
+                                >
+                                  ➕ Otro…
+                                </button>
+                              </>
+                            )}
                           </div>
                         )}
                       </span>
