@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import { createPortal } from "react-dom";
 import type { Node } from "reactflow";
 import type { FunnelNodeData, ProjectMember, Project, TaskPriority, ProjectRole, NodeTask } from "@/lib/types";
 import { ROLE_LABELS, ROLE_COLORS, ALERT_COLORS, PRIORITY_COLORS } from "@/lib/constants";
@@ -119,7 +120,11 @@ export function BoardView({
     const onDoc = (e: MouseEvent) => {
       if (roleMenuRef.current && !roleMenuRef.current.contains(e.target as globalThis.Node)) closeRoleMenu();
     };
-    const onScroll = () => closeRoleMenu();
+    const onScroll = (e: Event) => {
+      // ignore scrolling that happens inside the dropdown itself (browsing roles)
+      if (roleMenuRef.current && roleMenuRef.current.contains(e.target as globalThis.Node)) return;
+      closeRoleMenu();
+    };
     document.addEventListener("mousedown", onDoc);
     window.addEventListener("scroll", onScroll, true);
     return () => {
@@ -719,11 +724,14 @@ export function BoardView({
                           {ROLE_LABELS[n.data.role] ?? n.data.role}
                           <span style={{ fontSize: 8 }}>▾</span>
                         </button>
-                        {roleMenuNodeId === n.id && roleMenuPos && (
+                        {roleMenuNodeId === n.id && roleMenuPos && typeof document !== "undefined" && createPortal(
                           <div
                             className="al-role-dropdown"
                             ref={roleMenuRef}
-                            style={{ top: roleMenuPos.top, left: roleMenuPos.left }}
+                            style={{
+                              top: roleMenuPos.top,
+                              left: Math.min(roleMenuPos.left, (typeof window !== "undefined" ? window.innerWidth : roleMenuPos.left + 250) - 250),
+                            }}
                             onClick={(e) => e.stopPropagation()}
                           >
                             {roleCustomMode ? (
@@ -782,7 +790,8 @@ export function BoardView({
                                 </button>
                               </>
                             )}
-                          </div>
+                          </div>,
+                          document.body
                         )}
                       </span>
                     ) : (
