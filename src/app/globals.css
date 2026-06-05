@@ -4527,3 +4527,152 @@ body {
 .al-role-custom button:hover {
   filter: brightness(1.08);
 }
+
+/* ===============================================================
+   MULTI-SELECT  (Increment 3)
+   =============================================================== */
+
+/* ── Checkbox cell wrapper (holds both sel-check + al-check) ── */
+.al-check-cell {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  flex-shrink: 0;
+}
+
+/* ── Square selection checkbox ── */
+.al-sel-check {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  cursor: pointer;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  opacity: 0;
+  transition: opacity .15s, background .15s, border-color .15s;
+  z-index: 1;
+}
+/* Show on row hover (via parent) */
+.al-task-row:hover .al-sel-check {
+  opacity: 1;
+}
+/* Show when any task is selected (always-show class added in JS) */
+.al-sel-check.always-show {
+  opacity: 1;
+}
+/* Checked state */
+.al-sel-check.checked {
+  background: var(--brand);
+  border-color: var(--brand);
+  opacity: 1;
+}
+.al-sel-check.checked::after {
+  content: "✓";
+  font-size: 9px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+/* Hide the completion circle when sel-check is visible */
+.al-task-row:hover .al-check,
+.al-task-row.multi-selected .al-check {
+  opacity: 0;
+  pointer-events: none;
+}
+/* But restore completion circle when NOT canEdit (no sel-check rendered) */
+.al-check-cell:not(:has(.al-sel-check)) .al-check,
+.al-sel-check.always-show ~ .al-check {
+  pointer-events: none;
+}
+
+/* ── Selected row highlight ── */
+.al-task-row.multi-selected {
+  background: rgba(124, 58, 237, 0.08);
+}
+.al-task-row.multi-selected:hover {
+  background: rgba(124, 58, 237, 0.12);
+}
+
+/* ── Bulk actions bar ── */
+.al-bulk-bar {
+  position: fixed;
+  bottom: 0;
+  left: 190px; /* sidebar width */
+  right: 0;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, .12);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 24px;
+  gap: 12px;
+  z-index: 200;
+  flex-shrink: 0;
+}
+.al-bulk-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.al-bulk-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.al-bulk-count {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+.al-bulk-btn {
+  padding: 6px 12px;
+  border-radius: 7px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+  font-family: inherit;
+}
+.al-bulk-btn:hover {
+  background: var(--surface3);
+  color: var(--text);
+}
+.al-bulk-deselect {
+  color: var(--text2);
+  background: transparent;
+  border-color: transparent;
+  font-size: 12px;
+}
+.al-bulk-deselect:hover {
+  background: var(--surface2);
+  border-color: var(--border);
+  color: var(--text);
+}
+.al-bulk-move {
+  outline: none;
+  cursor: pointer;
+}
+.al-bulk-delete {
+  background: var(--surface2);
+  color: #E24B4A;
+  border-color: #FCA5A5;
+}
+.al-bulk-delete:hover {
+  background: #FEE2E2;
+  border-color: #E24B4A;
+  color: #DC2626;
+}

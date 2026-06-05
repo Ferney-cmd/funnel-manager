@@ -58,6 +58,15 @@ export function BoardView({
   useEffect(() => { setMounted(true); }, []);
   const canDelete = myRole === "owner";
 
+  /* ── Multi-select state ── */
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const toggleSelect = (taskId: string) => setSelectedIds(prev => {
+    const next = new Set(prev);
+    next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+    return next;
+  });
+  const clearSelection = () => setSelectedIds(new Set());
+
   const [collapsed,    setCollapsed]   = useState<Record<string, boolean>>({});
   const [selectedTask, setSelectedTask]= useState<{ nodeId: string; taskId: string } | null>(null);
   const [addingIn,     setAddingIn]    = useState<string | null>(null);
@@ -218,6 +227,9 @@ export function BoardView({
     if (selectedTask?.taskId) onLoadComments(selectedTask.taskId);
   }, [selectedTask?.taskId, onLoadComments]);
 
+  /* Clear multi-selection when groupBy changes */
+  useEffect(() => { clearSelection(); }, [groupBy]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const clearAdd = () => { setAddingIn(null); setAddText(""); setAddDate(""); setAddPriority("normal"); };
 
   const submitAdd = (nodeId: string) => {
@@ -338,6 +350,17 @@ export function BoardView({
     return groups;
   }, [groupBy, nodes, members, passFilters, sortTasks]);
 
+  /* ── taskId → {nodeId, task} lookup for bulk actions ── */
+  const taskLookup = useMemo(() => {
+    const map = new Map<string, { nodeId: string; task: import("@/lib/types").NodeTask }>();
+    for (const n of nodes) {
+      for (const t of n.data.tasks) {
+        map.set(t.id, { nodeId: n.id, task: t });
+      }
+    }
+    return map;
+  }, [nodes]);
+
   if (!project) return (
     <div className="view-placeholder">
       <span style={{ fontSize: 32 }}>▤</span>
@@ -363,9 +386,11 @@ export function BoardView({
     const ac       = ALERT_COLORS[alert];
     const pc       = PRIORITY_COLORS[t.priority ?? "normal"];
     const assignee = members.find((m) => m.id === t.assignedTo);
-    const isActive = selectedTask?.taskId === t.id;
+    const isActive  = selectedTask?.taskId === t.id;
     const isEditing = editingTaskId === t.id;
     const dndOn     = canEdit && groupBy === "module" && sortBy === "manual" && dndIndex !== undefined && !isEditing;
+    const isMultiSelected = selectedIds.has(t.id);
+    const anySelected = selectedIds.size > 0;
 
     const showIndicatorBefore =
       dndOn && dropIndicator?.nodeId === node.id && dropIndicator.index === dndIndex;
@@ -376,7 +401,7 @@ export function BoardView({
       <div
         key={`${node.id}:${t.id}`}
         draggable={dndOn}
-        className={`al-task-row${t.done ? " done" : ""}${isActive ? " active" : ""}${draggingId === t.id ? " dragging" : ""}`}
+        className={`al-task-row${t.done ? " done" : ""}${isActive ? " active" : ""}${draggingId === t.id ? " dragging" : ""}${isMultiSelected ? " multi-selected" : ""}`}
         onClick={() => { if (!isEditing) setSelectedTask({ nodeId: node.id, taskId: t.id }); }}
         onDragStart={dndOn ? (e) => {
           dragRef.current = { taskId: t.id, fromNodeId: node.id };
@@ -411,11 +436,21 @@ export function BoardView({
         } : undefined}
         onDragEnd={dndOn ? clearDrag : undefined}
       >
-        {/* checkbox */}
-        <button
-          className={`al-check${t.done ? " done" : ""}`}
-          onClick={(e) => { e.stopPropagation(); onToggleTask(node.id, t.id); }}
-        />
+        {/* checkbox cell: sel-check (square) overlays al-check (circle) on hover */}
+        <div className="al-check-cell">
+          {canEdit && (
+            <button
+              className={`al-sel-check${isMultiSelected ? " checked" : ""}${anySelected ? " always-show" : ""}`}
+              onClick={(e) => { e.stopPropagation(); toggleSelect(t.id); }}
+              title={isMultiSelected ? "Deseleccionar" : "Seleccionar"}
+              aria-label={isMultiSelected ? "Deseleccionar tarea" : "Seleccionar tarea"}
+            />
+          )}
+          <button
+            className={`al-check${t.done ? " done" : ""}`}
+            onClick={(e) => { e.stopPropagation(); onToggleTask(node.id, t.id); }}
+          />
+        </div>
 
         {/* name */}
         <div className="al-col-name al-task-name">
@@ -1026,6 +1061,88 @@ export function BoardView({
           />
         )}
       </div>
+
+      {/* ── Bulk actions bar ── */}
+      {selectedIds.size > 0 && (
+        <div className="al-bulk-bar">
+          <div className="al-bulk-left">
+            <span className="al-bulk-count">{selectedIds.size} tarea{selectedIds.size !== 1 ? "s" : ""} seleccionada{selectedIds.size !== 1 ? "s" : ""}</span>
+            <button className="al-bulk-btn al-bulk-deselect" onClick={clearSelection}>✕ Deseleccionar todo</button>
+          </div>
+          {canEdit && (
+            <div className="al-bulk-right">
+              {/* Completar pending tasks */}
+              <button
+                className="al-bulk-btn"
+                onClick={() => {
+                  selectedIds.forEach((id) => {
+                    const entry = taskLookup.get(id);
+                    if (entry && !entry.task.done) onToggleTask(entry.nodeId, id);
+                  });
+                  clearSelection();
+                }}
+              >
+                ✓ Completar
+              </button>
+              {/* Marcar pendiente */}
+              <button
+                className="al-bulk-btn"
+                onClick={() => {
+                  selectedIds.forEach((id) => {
+                    const entry = taskLookup.get(id);
+                    if (entry && entry.task.done) onToggleTask(entry.nodeId, id);
+                  });
+                  clearSelection();
+                }}
+              >
+                ↩ Pendiente
+              </button>
+              {/* Mover a módulo */}
+              {groupBy === "module" && (
+                <select
+                  className="al-bulk-btn al-bulk-move"
+                  defaultValue=""
+                  onChange={(e) => {
+                    const toNodeId = e.target.value;
+                    if (!toNodeId) return;
+                    const toNode = nodes.find((n) => n.id === toNodeId);
+                    const targetIndex = toNode ? toNode.data.tasks.length : 0;
+                    selectedIds.forEach((id) => {
+                      const entry = taskLookup.get(id);
+                      if (entry && entry.nodeId !== toNodeId) {
+                        onMoveTaskToNode(id, entry.nodeId, toNodeId, targetIndex);
+                      }
+                    });
+                    clearSelection();
+                    e.target.value = "";
+                  }}
+                >
+                  <option value="">↗ Mover a módulo…</option>
+                  {nodes.map((n) => (
+                    <option key={n.id} value={n.id}>{n.data.icon} {n.data.title}</option>
+                  ))}
+                </select>
+              )}
+              {/* Eliminar (owner only) */}
+              {canDelete && (
+                <button
+                  className="al-bulk-btn al-bulk-delete"
+                  onClick={() => {
+                    if (!confirm(`¿Eliminar ${selectedIds.size} tarea${selectedIds.size !== 1 ? "s" : ""} seleccionada${selectedIds.size !== 1 ? "s" : ""}?`)) return;
+                    selectedIds.forEach((id) => {
+                      const entry = taskLookup.get(id);
+                      if (entry) onDeleteTask(entry.nodeId, id);
+                    });
+                    clearSelection();
+                  }}
+                >
+                  🗑 Eliminar
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
