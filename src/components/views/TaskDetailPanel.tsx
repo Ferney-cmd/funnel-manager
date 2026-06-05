@@ -5,6 +5,7 @@ import { getInitials, type Profile } from "@/lib/profiles";
 import { PRIORITY_COLORS, ALERT_COLORS } from "@/lib/constants";
 import { computeTaskAlertStatus } from "@/lib/types";
 import type { NodeTask, ProjectMember, TaskComment, TaskPriority } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 
 interface TaskDetailPanelProps {
   task:        NodeTask;
@@ -27,10 +28,16 @@ export function TaskDetailPanel({
   canEdit, onClose, onToggle, onDelete, onUpdate,
   comments, loadingComments, onAddComment,
 }: TaskDetailPanelProps) {
+  const supabase = createClient();
+
   const [editingName, setEditingName]   = useState(false);
   const [nameVal,     setNameVal]       = useState(task.text);
   const [descVal,     setDescVal]       = useState(task.description ?? "");
   const [commentText, setCommentText]   = useState("");
+
+  /* ── Multi-assignee ── */
+  const [assignees,        setAssignees]        = useState<string[]>([]);
+  const [loadingAssignees, setLoadingAssignees] = useState(false);
 
   const nameRef     = useRef<HTMLInputElement>(null);
   const chatEndRef  = useRef<HTMLDivElement>(null);
@@ -40,6 +47,19 @@ export function TaskDetailPanel({
     setNameVal(task.text);
     setDescVal(task.description ?? "");
   }, [task.id, task.text, task.description]);
+
+  /* Load multi-assignees when task changes */
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingAssignees(true);
+    supabase.from("task_assignees").select("user_id").eq("task_id", task.id).then(({ data }) => {
+      if (cancelled) return;
+      setAssignees((data ?? []).map((r: { user_id: string }) => r.user_id));
+      setLoadingAssignees(false);
+    });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.id]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -74,7 +94,6 @@ export function TaskDetailPanel({
   const alert   = computeTaskAlertStatus(task);
   const ac      = ALERT_COLORS[alert];
   const pc      = PRIORITY_COLORS[task.priority ?? "normal"];
-  const assignee = members.find((m) => m.id === task.assignedTo);
 
   return (
     <div className="tdp-wrap">
@@ -129,35 +148,59 @@ export function TaskDetailPanel({
         {/* ── Fields ── */}
         <div className="tdp-fields">
 
-          {/* Assignee */}
+          {/* Assignees (multi) */}
           <div className="tdp-field-row">
-            <span className="tdp-field-label">Responsable</span>
-            <div className="tdp-field-value">
-              {canEdit ? (
+            <span className="tdp-field-label">Responsables</span>
+            <div className="tdp-field-value" style={{ flexWrap: "wrap", gap: 6 }}>
+              {loadingAssignees ? (
+                <span style={{ color: "var(--text3)", fontSize: 12 }}>Cargando…</span>
+              ) : assignees.length === 0 ? (
+                <span style={{ color: "var(--text3)", fontSize: 12 }}>Sin asignar</span>
+              ) : (
+                assignees.map((uid) => {
+                  const m = members.find((mb) => mb.id === uid);
+                  if (!m) return null;
+                  return (
+                    <span key={uid} className="tdp-assignee-chip" style={{ display: "inline-flex", alignItems: "center", gap: 4 }}>
+                      <span className="tdp-avatar-sm" style={{ background: m.color }}>
+                        {getInitials(m.full_name || m.email)}
+                      </span>
+                      <span style={{ fontSize: 12 }}>{m.full_name || m.email}</span>
+                      {canEdit && (
+                        <button
+                          style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 11, padding: "0 2px" }}
+                          title={`Quitar a ${m.full_name || m.email}`}
+                          onClick={async () => {
+                            await supabase.from("task_assignees").delete().eq("task_id", task.id).eq("user_id", uid);
+                            const next = assignees.filter((id) => id !== uid);
+                            setAssignees(next);
+                            onUpdate({ assignedTo: next[0] ?? null });
+                          }}
+                        >✕</button>
+                      )}
+                    </span>
+                  );
+                })
+              )}
+              {canEdit && (
                 <select
                   className="tdp-select"
-                  value={task.assignedTo ?? ""}
-                  onChange={(e) => onUpdate({ assignedTo: e.target.value || null })}
+                  value=""
+                  onChange={async (e) => {
+                    const uid = e.target.value;
+                    if (!uid || assignees.includes(uid)) return;
+                    await supabase.from("task_assignees").insert({ task_id: task.id, user_id: uid });
+                    const next = [...assignees, uid];
+                    setAssignees(next);
+                    if (next.length === 1) onUpdate({ assignedTo: uid });
+                  }}
+                  style={{ fontSize: 12, minWidth: 120 }}
                 >
-                  <option value="">Sin asignar</option>
-                  {members.map((m) => (
+                  <option value="">+ Agregar responsable</option>
+                  {members.filter((m) => !assignees.includes(m.id)).map((m) => (
                     <option key={m.id} value={m.id}>{m.full_name || m.email}</option>
                   ))}
                 </select>
-              ) : assignee ? (
-                <div className="tdp-assignee-chip">
-                  <span className="tdp-avatar-sm" style={{ background: assignee.color }}>
-                    {getInitials(assignee.full_name || assignee.email)}
-                  </span>
-                  <span>{assignee.full_name || assignee.email}</span>
-                </div>
-              ) : (
-                <span style={{ color: "var(--text3)", fontSize: 12 }}>Sin asignar</span>
-              )}
-              {assignee && (
-                <span className="tdp-avatar-sm" style={{ background: assignee.color, marginLeft: canEdit ? 8 : 0 }}>
-                  {getInitials(assignee.full_name || assignee.email)}
-                </span>
               )}
             </div>
           </div>

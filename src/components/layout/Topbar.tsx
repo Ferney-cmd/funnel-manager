@@ -16,12 +16,15 @@ interface TopbarProps {
   onDuplicate: () => void;
   onAddModule: () => void;
   onOpenTeam:  () => void;
+  unreadCount?:          number;
+  onOpenNotifications?:  () => void;
 }
 
 export function Topbar({
   projectId, projects, progress,
   members, onlineUsers,
   onRename, onDuplicate, onAddModule, onOpenTeam,
+  unreadCount = 0, onOpenNotifications,
 }: TopbarProps) {
   const project    = projects.find((p) => p.id === projectId);
   const statusLabel = project ? PROJECT_STATUSES[project.status].label : "—";
@@ -110,6 +113,30 @@ export function Topbar({
       )}
 
       <ThemeToggle />
+
+      {onOpenNotifications && (
+        <button
+          className="topbar-notif-btn"
+          onClick={onOpenNotifications}
+          title="Notificaciones"
+          style={{ position: "relative" }}
+        >
+          🔔
+          {unreadCount > 0 && (
+            <span
+              style={{
+                position: "absolute", top: 2, right: 2,
+                background: "#E24B4A", color: "#fff",
+                fontSize: 9, fontWeight: 700, lineHeight: 1,
+                borderRadius: 99, padding: "2px 4px",
+                minWidth: 14, textAlign: "center",
+              }}
+            >
+              {unreadCount > 99 ? "99+" : unreadCount}
+            </span>
+          )}
+        </button>
+      )}
 
       <button className="topbar-btn" onClick={onOpenTeam} title="Gestionar equipo">
         <span>👥</span>

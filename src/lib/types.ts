@@ -52,6 +52,7 @@ export interface NodeTask {
   alertStatus?: TaskAlertStatus;
   assignedTo?: string | null;
   statusId?: string | null;
+  parentTaskId?: string | null;
 }
 
 export interface TaskStatus {

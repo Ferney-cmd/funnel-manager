@@ -1,18 +1,23 @@
 "use client";
 
+import { useState } from "react";
 import type { Node } from "reactflow";
 import type { FunnelNodeData, ProjectMember, Project } from "@/lib/types";
 import { ROLE_LABELS, ROLE_COLORS } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
 
 interface DashboardProps {
-  project:      Project | undefined;
-  nodes:        Node<FunnelNodeData>[];
-  members:      ProjectMember[];
-  onSelectView: (view: string) => void;
+  project:       Project | undefined;
+  nodes:         Node<FunnelNodeData>[];
+  members:       ProjectMember[];
+  onSelectView?: (view: string) => void;
 }
 
 export function Dashboard({ project, nodes, members, onSelectView }: DashboardProps) {
+  const [aiSummary, setAiSummary]   = useState<string>("");
+  const [aiLoading, setAiLoading]   = useState<boolean>(false);
+  const [aiError,   setAiError]     = useState<string>("");
+
   if (!project) {
     return (
       <div className="dash-empty">
@@ -39,6 +44,44 @@ export function Dashboard({ project, nodes, members, onSelectView }: DashboardPr
   );
   const noOwnerModules  = nodes.filter((n) => !n.data.assignedTo);
   const noTasksModules  = nodes.filter((n) => n.data.tasks.length === 0);
+
+  /* ── AI Summary handler ────────────────────────────────────── */
+  async function handleAiSummary() {
+    setAiLoading(true);
+    setAiError("");
+    setAiSummary("");
+    try {
+      const res = await fetch("/api/ai/summary", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectName: project!.name,
+          stats: {
+            total:            totalTasks,
+            done:             tasksDone,
+            pct:              overall,
+            modules:          totalModules,
+            completedModules,
+            blocked:          blockedModules.length,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        if (data.error === "AI_NOT_CONFIGURED") {
+          setAiError("⚠ La IA no está configurada. Configura ANTHROPIC_API_KEY en EasyPanel.");
+        } else {
+          setAiError(data.error as string);
+        }
+      } else {
+        setAiSummary(data.summary as string);
+      }
+    } catch {
+      setAiError("Error al conectar con la IA. Intenta de nuevo.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   /* Per-role progress */
   const roleStats = Object.keys(ROLE_LABELS).map((role) => {
@@ -80,23 +123,121 @@ export function Dashboard({ project, nodes, members, onSelectView }: DashboardPr
 
   return (
     <div className="dashboard">
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       <div className="view-back-bar">
-        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
+        <button className="bt-back-btn" onClick={() => onSelectView?.("canvas")}>← Embudo</button>
         <span className="view-back-title">Resumen · {project.name}</span>
       </div>
       {/* ── Header ── */}
       <div className="dash-hero">
-        <div>
-          <div className="dash-hero-label">Tablero del jefe · {project.name}</div>
-          <div className="dash-hero-title">{overall}% completado</div>
-          <div className="dash-hero-sub">
-            {tasksDone} de {totalTasks} tareas · {completedModules}/{totalModules} módulos completos
+        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            <div className="dash-hero-label">Tablero del jefe · {project.name}</div>
+            <div className="dash-hero-title">{overall}% completado</div>
+            <div className="dash-hero-sub">
+              {tasksDone} de {totalTasks} tareas · {completedModules}/{totalModules} módulos completos
+            </div>
           </div>
+          <button
+            onClick={handleAiSummary}
+            disabled={aiLoading}
+            style={{
+              flexShrink: 0,
+              marginTop: 2,
+              padding: "5px 12px",
+              fontSize: 12,
+              fontWeight: 600,
+              borderRadius: 8,
+              border: "1px solid var(--border)",
+              background: "var(--surface)",
+              color: "var(--text)",
+              cursor: aiLoading ? "not-allowed" : "pointer",
+              opacity: aiLoading ? 0.6 : 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {aiLoading ? "Generando…" : "✨ Resumen IA"}
+          </button>
         </div>
         <div className="dash-hero-bar">
           <div className="dash-hero-bar-fill" style={{ width: `${overall}%` }} />
         </div>
       </div>
+
+      {/* ── AI Summary card ── */}
+      {aiLoading && (
+        <div style={{
+          margin: "0 0 12px",
+          padding: "12px 16px",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          fontSize: 13,
+          color: "var(--text2)",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}>
+          <span style={{
+            display: "inline-block",
+            width: 14,
+            height: 14,
+            border: "2px solid var(--border)",
+            borderTopColor: "var(--brand)",
+            borderRadius: "50%",
+            animation: "spin 0.8s linear infinite",
+          }} />
+          Generando resumen…
+        </div>
+      )}
+      {!aiLoading && aiError && (
+        <div style={{
+          margin: "0 0 12px",
+          padding: "12px 16px",
+          background: "var(--surface)",
+          border: "1px solid #FCA5A5",
+          borderRadius: 10,
+          fontSize: 13,
+          color: "#DC2626",
+        }}>
+          {aiError}
+        </div>
+      )}
+      {!aiLoading && aiSummary && (
+        <div style={{
+          margin: "0 0 12px",
+          padding: "14px 16px",
+          background: "var(--surface)",
+          border: "1px solid var(--border)",
+          borderRadius: 10,
+          position: "relative",
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--brand)", marginBottom: 6, letterSpacing: "0.04em" }}>
+            ✨ RESUMEN IA
+          </div>
+          <div style={{ fontSize: 13, color: "var(--text)", fontStyle: "italic", lineHeight: 1.6, whiteSpace: "pre-wrap" }}>
+            {aiSummary}
+          </div>
+          <button
+            onClick={() => setAiSummary("")}
+            aria-label="Cerrar resumen"
+            style={{
+              position: "absolute",
+              top: 10,
+              right: 10,
+              background: "transparent",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 14,
+              color: "var(--text3)",
+              lineHeight: 1,
+              padding: 2,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ── Atención requerida ── */}
       {(blockedModules.length > 0 || noOwnerModules.length > 0 || noTasksModules.length > 0) && (

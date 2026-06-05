@@ -21,6 +21,7 @@ import { PortfolioView }  from "@/components/views/PortfolioView";
 import { WorkloadView }   from "@/components/views/WorkloadView";
 import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
+import { NotificationsPanel } from "@/components/views/NotificationsPanel";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
@@ -73,6 +74,8 @@ export function AppShell() {
   const [onlineUsers,      setOnlineUsers]       = useState<string[]>([]);
   const [commentsByTask,   setCommentsByTask]    = useState<Record<string, import("@/lib/types").TaskComment[]>>({});
   const [loadingComments,  setLoadingComments]   = useState<Record<string, boolean>>({});
+  const [notifOpen,        setNotifOpen]         = useState(false);
+  const [unreadCount,      setUnreadCount]       = useState(0);
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
@@ -622,6 +625,56 @@ export function AppShell() {
     return () => { supabase.removeChannel(ch); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId, me?.id]);
+
+  /* ── Unread notifications count ─────────────────────────────── */
+  useEffect(() => {
+    if (!me) return;
+    let cancelled = false;
+
+    // Initial count
+    supabase
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", me.id)
+      .eq("read", false)
+      .then(({ count }) => {
+        if (!cancelled) setUnreadCount(count ?? 0);
+      });
+
+    // Realtime: increment on new unread notification
+    const ch = supabase
+      .channel(`notif-count:${me.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${me.id}` },
+        (payload) => {
+          if (cancelled) return;
+          const n = payload.new as { read: boolean };
+          if (!n.read) setUnreadCount((c) => c + 1);
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${me.id}` },
+        () => {
+          if (cancelled) return;
+          // Re-fetch count on any update (mark-read)
+          supabase
+            .from("notifications")
+            .select("id", { count: "exact", head: true })
+            .eq("user_id", me.id)
+            .eq("read", false)
+            .then(({ count }) => { if (!cancelled) setUnreadCount(count ?? 0); });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      cancelled = true;
+      supabase.removeChannel(ch);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [me?.id]);
 
   const currentNodes   = useMemo(() => nodesMap[activeProjectId]  ?? [], [nodesMap,  activeProjectId]);
   const currentEdges   = useMemo(() => edgesMap[activeProjectId]  ?? [], [edgesMap,  activeProjectId]);
@@ -1519,6 +1572,8 @@ export function AppShell() {
         onDuplicate={handleDuplicate}
         onAddModule={handleAddModule}
         onOpenTeam={() => setTeamOpen(true)}
+        unreadCount={unreadCount}
+        onOpenNotifications={() => setNotifOpen(true)}
       />
 
       {/* Always rendered to preserve layout */}
@@ -1576,7 +1631,12 @@ export function AppShell() {
 
       {activeView === "timeline" && (
         <div className="view-scroll">
-          <TimelineView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
+          <TimelineView
+            project={activeProject}
+            nodes={currentNodes}
+            onSelectView={setActiveView}
+            onUpdateTask={(nodeId, taskId, updates) => handleUpdateTask(nodeId, taskId, updates)}
+          />
         </div>
       )}
 
@@ -1684,6 +1744,12 @@ export function AppShell() {
         }
         onClose={() => setWizardOpen(false)}
         onCreated={handleWizardCreated}
+      />
+
+      <NotificationsPanel
+        open={notifOpen}
+        onClose={() => setNotifOpen(false)}
+        me={me}
       />
     </div>
   );

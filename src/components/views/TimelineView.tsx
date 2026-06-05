@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef } from "react";
 import type { Node } from "reactflow";
 import type { FunnelNodeData, Project, NodeTask } from "@/lib/types";
 import { PRIORITY_COLORS } from "@/lib/constants";
@@ -9,10 +9,24 @@ interface TimelineViewProps {
   project: Project | undefined;
   nodes: Node<FunnelNodeData>[];
   onSelectView: (view: string) => void;
+  onUpdateTask?: (
+    nodeId: string,
+    taskId: string,
+    updates: { dueDate?: string | null; startDate?: string | null }
+  ) => void;
+}
+
+interface DragBarState {
+  taskId: string;
+  nodeId: string;
+  originalStartOffset: number;
+  originalEndOffset: number;
+  startX: number;
 }
 
 interface FlatTask {
   task: NodeTask;
+  nodeId: string;
   nodeTitle: string;
   nodeIcon: string;
 }
@@ -47,8 +61,10 @@ function fmtRange(start: Date, end: Date): string {
 
 const MONTH_NAMES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
 
-export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps) {
+export function TimelineView({ project, nodes, onSelectView, onUpdateTask }: TimelineViewProps) {
   const [zoom, setZoom] = useState<"week" | "month">("month");
+  const [dragDeltaDays, setDragDeltaDays] = useState(0);
+  const dragBarRef = useRef<DragBarState | null>(null);
   const dayWidth = zoom === "week" ? 36 : 12;
 
   const backBar = (
@@ -74,6 +90,7 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
       nodes.flatMap((n) =>
         n.data.tasks.map((task) => ({
           task,
+          nodeId: n.id,
           nodeTitle: n.data.title,
           nodeIcon: n.data.icon,
         }))
@@ -201,7 +218,33 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
           </div>
 
           {/* Body: module groups + task rows. Today line spans the body. */}
-          <div style={{ position: "relative" }}>
+          <div
+            style={{ position: "relative" }}
+            onDragOver={(e) => {
+              if (!dragBarRef.current) return;
+              e.preventDefault();
+              const deltaX = e.clientX - dragBarRef.current.startX;
+              const delta = Math.round(deltaX / dayWidth);
+              setDragDeltaDays(delta);
+            }}
+            onDrop={(e) => {
+              const drag = dragBarRef.current;
+              if (!drag || !onUpdateTask) return;
+              e.preventDefault();
+              const deltaX = e.clientX - drag.startX;
+              const delta = Math.round(deltaX / dayWidth);
+              const originalStart = addDays(minDate, drag.originalStartOffset);
+              const originalEnd = addDays(minDate, drag.originalEndOffset);
+              const newStart = addDays(originalStart, delta);
+              const newEnd = addDays(originalEnd, delta);
+              onUpdateTask(drag.nodeId, drag.taskId, {
+                startDate: newStart.toISOString().slice(0, 10),
+                dueDate: newEnd.toISOString().slice(0, 10),
+              });
+              dragBarRef.current = null;
+              setDragDeltaDays(0);
+            }}
+          >
             {todayInRange && (
               <div
                 className="tl-today"
@@ -227,6 +270,11 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
                   const width = Math.max(span, 1) * dayWidth;
                   const pc = PRIORITY_COLORS[r.task.priority ?? "normal"];
                   const tip = `${r.task.text} · ${fmtRange(r.start, r.end)}`;
+                  const isDragging =
+                    dragBarRef.current?.taskId === r.task.id;
+                  const previewLeft = isDragging
+                    ? left + dragDeltaDays * dayWidth
+                    : left;
 
                   return (
                     <div
@@ -262,10 +310,49 @@ export function TimelineView({ project, nodes, onSelectView }: TimelineViewProps
                             }}
                           />
                         ) : (
-                          <div
-                            className="tl-bar"
-                            style={{ left, width, background: pc.fg }}
-                          />
+                          <>
+                            {/* Original bar — shown at 50% opacity while dragging */}
+                            <div
+                              className="tl-bar"
+                              draggable={onUpdateTask ? true : false}
+                              style={{
+                                left,
+                                width,
+                                background: pc.fg,
+                                opacity: isDragging ? 0.5 : 1,
+                                cursor: onUpdateTask ? "grab" : "default",
+                              }}
+                              onDragStart={(e) => {
+                                if (!onUpdateTask) return;
+                                dragBarRef.current = {
+                                  taskId: r.task.id,
+                                  nodeId: r.nodeId,
+                                  originalStartOffset: offset,
+                                  originalEndOffset: offset + span - 1,
+                                  startX: e.clientX,
+                                };
+                                setDragDeltaDays(0);
+                              }}
+                              onDragEnd={() => {
+                                dragBarRef.current = null;
+                                setDragDeltaDays(0);
+                              }}
+                            />
+                            {/* Preview ghost bar while dragging */}
+                            {isDragging && dragDeltaDays !== 0 && (
+                              <div
+                                className="tl-bar"
+                                style={{
+                                  left: previewLeft,
+                                  width,
+                                  background: pc.fg,
+                                  opacity: 0.85,
+                                  pointerEvents: "none",
+                                  outline: "2px solid var(--accent, #6366f1)",
+                                }}
+                              />
+                            )}
+                          </>
                         )}
                       </div>
                     </div>

@@ -68,6 +68,14 @@ export function BoardView({
   const clearSelection = () => setSelectedIds(new Set());
 
   const [collapsed,    setCollapsed]   = useState<Record<string, boolean>>({});
+  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
+  const toggleSubtasks = useCallback((taskId: string) => {
+    setExpandedSubtasks((prev) => {
+      const next = new Set(prev);
+      next.has(taskId) ? next.delete(taskId) : next.add(taskId);
+      return next;
+    });
+  }, []);
   const [selectedTask, setSelectedTask]= useState<{ nodeId: string; taskId: string } | null>(null);
   const [addingIn,     setAddingIn]    = useState<string | null>(null);
   const [addText,      setAddText]     = useState("");
@@ -115,7 +123,40 @@ export function BoardView({
   const [showCompleted,  setShowCompleted]  = useState<boolean>(true);
   const [openPopover,    setOpenPopover]    = useState<null | "filter" | "sort" | "group" | "options">(null);
 
+  /* ── Saved views (localStorage) ── */
+  type SavedView = {
+    name: string;
+    filterAssignee: string;
+    filterPriority: string;
+    sortBy: SortBy;
+    groupBy: GroupBy;
+    showCompleted: boolean;
+  };
+  const [savedViews,     setSavedViews]     = useState<SavedView[]>([]);
+  const [savedViewsOpen, setSavedViewsOpen] = useState(false);
+  const [newViewName,    setNewViewName]    = useState("");
+  const savedViewsRef = useRef<HTMLDivElement>(null);
+
   const toolbarRef = useRef<HTMLDivElement>(null);
+
+  /* Load saved views when project changes */
+  useEffect(() => {
+    if (!project?.id || typeof window === "undefined") return;
+    try {
+      const raw = localStorage.getItem(`fm_views_${project.id}`);
+      setSavedViews(raw ? JSON.parse(raw) : []);
+    } catch { setSavedViews([]); }
+  }, [project?.id]);
+
+  /* close saved-views popover on outside click */
+  useEffect(() => {
+    if (!savedViewsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (savedViewsRef.current && !savedViewsRef.current.contains(e.target as globalThis.Node)) setSavedViewsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [savedViewsOpen]);
 
   /* close popover on outside click */
   useEffect(() => {
@@ -378,6 +419,60 @@ export function BoardView({
 
   const panelOpen = !!selTask;
 
+  /* ── Subtask child row (1 level deep, no checkbox, no subtask expand) ── */
+  const renderSubtaskRow = (t: NodeTask, node: Node<FunnelNodeData>) => {
+    const alert    = computeTaskAlertStatus(t);
+    const ac       = ALERT_COLORS[alert];
+    const pc       = PRIORITY_COLORS[t.priority ?? "normal"];
+    const assignee = members.find((m) => m.id === t.assignedTo);
+    const isActive = selectedTask?.taskId === t.id;
+
+    return (
+      <div
+        key={`sub:${node.id}:${t.id}`}
+        className={`al-task-row al-subtask-row${t.done ? " done" : ""}${isActive ? " active" : ""}`}
+        onClick={() => setSelectedTask({ nodeId: node.id, taskId: t.id })}
+      >
+        <div className="al-check-cell">
+          <button
+            className={`al-check${t.done ? " done" : ""}`}
+            onClick={(e) => { e.stopPropagation(); onToggleTask(node.id, t.id); }}
+          />
+        </div>
+        <div className="al-col-name al-task-name">
+          <span className={`al-task-text${t.done ? " done" : ""}`}>{t.text}</span>
+        </div>
+        <div className="al-col-assignee">
+          {assignee ? (
+            <span className="al-avatar" style={{ background: assignee.color }} title={assignee.full_name || assignee.email}>
+              {getInitials(assignee.full_name || assignee.email)}
+            </span>
+          ) : (
+            <span className="al-avatar empty" title="Sin asignar">+</span>
+          )}
+        </div>
+        <div className="al-col-date">
+          {t.dueDate ? (
+            <span className="al-date-chip" style={{ color: alert === "overdue" || alert === "due_today" ? "#E24B4A" : "var(--text2)" }}>
+              📅 {fmtDate(t.dueDate)}
+            </span>
+          ) : (
+            <span className="al-date-empty">—</span>
+          )}
+        </div>
+        <div className="al-col-priority">
+          <span className="al-priority-chip" style={{ background: pc.bg, color: pc.fg }}>{pc.label}</span>
+        </div>
+        <div className="al-col-status">
+          {!t.done && t.dueDate && (
+            <span className={`task-alert-badge task-alert-${alert}`} style={{ background: ac.bg, color: ac.fg }}>{ac.label}</span>
+          )}
+          {t.done && <span style={{ fontSize: 11, color: "#10B981" }}>✓ Hecha</span>}
+        </div>
+      </div>
+    );
+  };
+
   /* ── Reusable task row ──
      dndIndex: visual index within the section. When provided (module mode + canEdit)
      the row becomes draggable and a drop target. */
@@ -391,6 +486,13 @@ export function BoardView({
     const dndOn     = canEdit && groupBy === "module" && sortBy === "manual" && dndIndex !== undefined && !isEditing;
     const isMultiSelected = selectedIds.has(t.id);
     const anySelected = selectedIds.size > 0;
+
+    // Subtask children (root tasks only — parentTaskId == null)
+    const nodeTaskList = node.data.tasks;
+    const isRootTask = !t.parentTaskId;
+    const children = isRootTask ? nodeTaskList.filter((c) => c.parentTaskId === t.id) : [];
+    const hasChildren = children.length > 0;
+    const subExpanded = expandedSubtasks.has(t.id);
 
     const showIndicatorBefore =
       dndOn && dropIndicator?.nodeId === node.id && dropIndicator.index === dndIndex;
@@ -438,6 +540,15 @@ export function BoardView({
       >
         {/* checkbox cell: sel-check (square) overlays al-check (circle) on hover */}
         <div className="al-check-cell">
+          {hasChildren && (
+            <button
+              className="al-subtask-toggle"
+              onClick={(e) => { e.stopPropagation(); toggleSubtasks(t.id); }}
+              title={subExpanded ? "Ocultar subtareas" : `Ver ${children.length} subtarea${children.length !== 1 ? "s" : ""}`}
+            >
+              {subExpanded ? "▾" : "▸"} {children.length}
+            </button>
+          )}
           {canEdit && (
             <button
               className={`al-sel-check${isMultiSelected ? " checked" : ""}${anySelected ? " always-show" : ""}`}
@@ -530,6 +641,8 @@ export function BoardView({
           )}
         </div>
       </div>
+      {/* Subtask rows (1 level deep) */}
+      {hasChildren && subExpanded && children.map((child) => renderSubtaskRow(child, node))}
       </div>
     );
   };
@@ -673,6 +786,85 @@ export function BoardView({
                 />
                 <span>Mostrar tareas completadas</span>
               </label>
+            </div>
+          )}
+        </div>
+
+        {/* Saved views */}
+        <div style={{ position: "relative" }} ref={savedViewsRef}>
+          <button
+            className={`lt-tool-btn${savedViewsOpen ? " active" : ""}`}
+            onClick={() => { setOpenPopover(null); setSavedViewsOpen((p) => !p); }}
+            title="Vistas guardadas"
+          >
+            💾
+          </button>
+          {savedViewsOpen && (
+            <div className="al-savedviews-popover">
+              <div style={{ marginBottom: 8 }}>
+                <input
+                  className="al-savedviews-input"
+                  placeholder="Nombre de esta vista…"
+                  value={newViewName}
+                  onChange={(e) => setNewViewName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Escape") setSavedViewsOpen(false); }}
+                />
+                <button
+                  className="lt-tool-btn"
+                  style={{ marginTop: 6, width: "100%" }}
+                  disabled={!newViewName.trim()}
+                  onClick={() => {
+                    if (!newViewName.trim() || !project?.id) return;
+                    const view: SavedView = {
+                      name: newViewName.trim(),
+                      filterAssignee, filterPriority, sortBy, groupBy, showCompleted,
+                    };
+                    const next = [...savedViews.slice(-9), view];
+                    setSavedViews(next);
+                    localStorage.setItem(`fm_views_${project.id}`, JSON.stringify(next));
+                    setNewViewName("");
+                  }}
+                >
+                  Guardar
+                </button>
+              </div>
+              {savedViews.length > 0 && (
+                <div style={{ borderTop: "1px solid var(--border)", paddingTop: 6 }}>
+                  {savedViews.map((sv, i) => (
+                    <div key={i} className="al-savedview-item">
+                      <span
+                        style={{ flex: 1, cursor: "pointer", fontSize: 12 }}
+                        onClick={() => {
+                          setFilterAssignee(sv.filterAssignee);
+                          setFilterPriority(sv.filterPriority);
+                          setSortBy(sv.sortBy);
+                          setGroupBy(sv.groupBy);
+                          setShowCompleted(sv.showCompleted);
+                          setSavedViewsOpen(false);
+                        }}
+                      >
+                        {sv.name}
+                      </span>
+                      <button
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "var(--text3)", fontSize: 12, padding: "0 4px" }}
+                        title="Eliminar vista"
+                        onClick={() => {
+                          const next = savedViews.filter((_, j) => j !== i);
+                          setSavedViews(next);
+                          if (project?.id) localStorage.setItem(`fm_views_${project.id}`, JSON.stringify(next));
+                        }}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {savedViews.length === 0 && (
+                <div style={{ fontSize: 11, color: "var(--text3)", textAlign: "center", paddingTop: 4 }}>
+                  No hay vistas guardadas
+                </div>
+              )}
             </div>
           )}
         </div>
