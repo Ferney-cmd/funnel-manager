@@ -52,6 +52,10 @@ export function BoardView({
   onRenameSection, onSetSectionRole,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
+
+  // Montado en cliente (para portal SSR-safe en Next.js)
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   const canDelete = myRole === "owner";
 
   const [collapsed,    setCollapsed]   = useState<Record<string, boolean>>({});
@@ -724,7 +728,7 @@ export function BoardView({
                           {ROLE_LABELS[n.data.role] ?? n.data.role}
                           <span style={{ fontSize: 8 }}>▾</span>
                         </button>
-                        {roleMenuNodeId === n.id && roleMenuPos && typeof document !== "undefined" && createPortal(
+                        {mounted && roleMenuNodeId === n.id && roleMenuPos && createPortal(
                           <div
                             className="al-role-dropdown"
                             ref={roleMenuRef}
