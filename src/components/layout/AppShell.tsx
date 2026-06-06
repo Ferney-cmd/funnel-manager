@@ -744,6 +744,25 @@ export function AppShell() {
     }
   }, [activeProjectId, zonesMap, supabase]);
 
+  /* ── Persist node/zone position on drag stop (confiable: posición final) ── */
+  const handleNodeDragStop = useCallback((_evt: React.MouseEvent, node: Node) => {
+    const zoneIds = new Set((zonesMap[activeProjectId] ?? []).map((z) => z.id));
+    const table = zoneIds.has(node.id) ? "funnel_zones" : "funnel_nodes";
+    const x = Math.round(node.position.x);
+    const y = Math.round(node.position.y);
+    // Asegura el store (por si algún cambio visual quedó pendiente)
+    const setMap = zoneIds.has(node.id) ? setZonesMap : setNodesMap;
+    setMap((prev: any) => ({
+      ...prev,
+      [activeProjectId]: (prev[activeProjectId] ?? []).map((n: any) =>
+        n.id !== node.id ? n : { ...n, position: { x, y } }
+      ),
+    }));
+    supabase.from(table).update({ position_x: x, position_y: y }).eq("id", node.id).then(({ error }) => {
+      if (error) console.error("No se pudo guardar la posición:", error.message);
+    });
+  }, [activeProjectId, zonesMap, supabase]);
+
   const handleEdgesChange = useCallback((changes: EdgeChange[]) => {
     setEdgesMap((prev) => ({
       ...prev,
@@ -1583,6 +1602,7 @@ export function AppShell() {
         onNodesChange={handleNodesChange}
         onEdgesChange={handleEdgesChange}
         onConnect={handleConnect}
+        onNodeDragStop={handleNodeDragStop}
         visible={activeView === "canvas"}
       />
 

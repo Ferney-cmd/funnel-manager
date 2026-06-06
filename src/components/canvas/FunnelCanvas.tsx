@@ -36,12 +36,13 @@ interface FunnelCanvasProps {
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onConnect:     (connection: Connection) => void;
+  onNodeDragStop?: (event: React.MouseEvent, node: Node) => void;
   visible?:      boolean;
 }
 
 export function FunnelCanvas({
   nodes, edges,
-  onNodesChange, onEdgesChange, onConnect,
+  onNodesChange, onEdgesChange, onConnect, onNodeDragStop,
   visible = true,
 }: FunnelCanvasProps) {
   return (
@@ -52,6 +53,7 @@ export function FunnelCanvas({
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onNodeDragStop={onNodeDragStop}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         defaultEdgeOptions={defaultEdgeOptions}
