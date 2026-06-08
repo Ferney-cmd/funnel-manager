@@ -8,6 +8,7 @@ import type { Profile } from "@/lib/profiles";
 interface MyTasksViewProps {
   me: Profile | null;
   onOpenTaskProject: (projectId: string) => void;
+  onSelectView: (view: string) => void;
 }
 
 type Priority = keyof typeof PRIORITY_COLORS;
@@ -74,7 +75,7 @@ function classifyTask(t: MyTask, today: Date, weekEnd: Date): SectionKey {
   return "upcoming";
 }
 
-export function MyTasksView({ me, onOpenTaskProject }: MyTasksViewProps) {
+export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksViewProps) {
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedOpen, setCompletedOpen] = useState(false);
@@ -209,6 +210,7 @@ export function MyTasksView({ me, onOpenTaskProject }: MyTasksViewProps) {
     return (
       <div className="mt-wrap">
         <div className="view-back-bar">
+          <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Mis Tareas</span>
         </div>
         <div className="mt-loading">Cargando…</div>
@@ -221,6 +223,7 @@ export function MyTasksView({ me, onOpenTaskProject }: MyTasksViewProps) {
   return (
     <div className="mt-wrap">
       <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
         <span className="view-back-title">Mis Tareas</span>
         {hasAny && (
           <span className="mt-section-count">{pendingCount} pendientes</span>

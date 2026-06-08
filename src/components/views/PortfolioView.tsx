@@ -8,6 +8,7 @@ import type { Project } from "@/lib/types";
 interface PortfolioViewProps {
   projects: Project[];
   onOpenProject: (projectId: string) => void;
+  onSelectView: (view: string) => void;
 }
 
 interface Aggregate {
@@ -35,7 +36,7 @@ function formatDue(dueDate: string | null): string {
   }
 }
 
-export function PortfolioView({ projects, onOpenProject }: PortfolioViewProps) {
+export function PortfolioView({ projects, onOpenProject, onSelectView }: PortfolioViewProps) {
   const [rows, setRows] = useState<
     { project_id: string; done: boolean; due_date: string | null }[]
   >([]);
@@ -106,6 +107,7 @@ export function PortfolioView({ projects, onOpenProject }: PortfolioViewProps) {
     return (
       <div className="pf-wrap">
         <div className="view-back-bar">
+          <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Portafolio</span>
         </div>
         <div className="mt-loading">Cargando…</div>
@@ -117,6 +119,7 @@ export function PortfolioView({ projects, onOpenProject }: PortfolioViewProps) {
     return (
       <div className="pf-wrap">
         <div className="view-back-bar">
+          <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Portafolio</span>
         </div>
         <div className="mt-empty">No tienes proyectos.</div>
@@ -127,6 +130,7 @@ export function PortfolioView({ projects, onOpenProject }: PortfolioViewProps) {
   return (
     <div className="pf-wrap">
       <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
         <span className="view-back-title">
           Portafolio · {projects.length} proyectos
         </span>

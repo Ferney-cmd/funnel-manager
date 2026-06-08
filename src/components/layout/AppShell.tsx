@@ -1671,6 +1671,7 @@ export function AppShell() {
           <MyTasksView
             me={me}
             onOpenTaskProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
+            onSelectView={setActiveView}
           />
         </div>
       )}
@@ -1680,6 +1681,7 @@ export function AppShell() {
           <PortfolioView
             projects={projects}
             onOpenProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
+            onSelectView={setActiveView}
           />
         </div>
       )}

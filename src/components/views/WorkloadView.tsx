@@ -157,6 +157,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
     return (
       <div className="wl-wrap">
         <div className="view-back-bar">
+          <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Carga del equipo</span>
         </div>
         <div className="wl-loading">Cargando…</div>
@@ -168,6 +169,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
     return (
       <div className="wl-wrap">
         <div className="view-back-bar">
+          <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Carga del equipo</span>
         </div>
         <div className="wl-empty">Nadie tiene tareas asignadas todavía.</div>
@@ -178,6 +180,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
   return (
     <div className="wl-wrap">
       <div className="view-back-bar">
+        <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
         <span className="view-back-title">Carga del equipo</span>
       </div>
 
