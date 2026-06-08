@@ -108,8 +108,20 @@ export function PermissionsView({ project, projectId, myRole, onSelectView }: Pe
 
   useEffect(() => { loadMembers(); }, [loadMembers]);
 
-  const handleRoleChange = async (member: LocalMember, newRole: "editor" | "viewer") => {
+  const handleRoleChange = async (member: LocalMember, newRole: ProjectRole) => {
     if (!isOwner || member.isOwner) return;
+
+    // Ask confirmation when promoting to owner
+    if (newRole === "owner") {
+      const name = member.full_name || member.email;
+      const ok = window.confirm(
+        `¿Darle a "${name}" acceso total como Dueño?\n\n` +
+        `Podrá eliminar tareas, gestionar el equipo y eliminar el proyecto.\n\n` +
+        `Puedes revertirlo en cualquier momento.`
+      );
+      if (!ok) return;
+    }
+
     setSaving(member.id);
     setErrorMsg(null);
 
@@ -153,7 +165,7 @@ export function PermissionsView({ project, projectId, myRole, onSelectView }: Pe
       {/* Legend */}
       <div className="perm-legend">
         <span className="perm-legend-item">
-          <span style={{ color: PROJECT_ROLE_COLORS.owner }}>●</span> Dueño — acceso total (no editable)
+          <span style={{ color: PROJECT_ROLE_COLORS.owner }}>●</span> Dueño — acceso total (gestiona equipo y puede eliminar proyecto)
         </span>
         <span className="perm-legend-item">
           <span style={{ color: PROJECT_ROLE_COLORS.editor }}>●</span> Project Manager — puede gestionar tareas
@@ -208,7 +220,9 @@ export function PermissionsView({ project, projectId, myRole, onSelectView }: Pe
                       <div className="perm-member-info">
                         <span className="perm-member-name">{m.full_name || m.email}</span>
                         <span className="perm-member-role" style={{ color: PROJECT_ROLE_COLORS[m.role] }}>
-                          {m.role === "owner" ? "Dueño" : m.role === "editor" ? "Project Manager" : "Colaborador"}
+                          {m.role === "owner"
+                            ? (m.isOwner ? "Dueño del proyecto" : "Dueño")
+                            : m.role === "editor" ? "Project Manager" : "Colaborador"}
                         </span>
                       </div>
                     </div>
@@ -236,8 +250,10 @@ export function PermissionsView({ project, projectId, myRole, onSelectView }: Pe
                           className="perm-role-select"
                           value={m.role}
                           disabled={saving === m.id}
-                          onChange={e => handleRoleChange(m, e.target.value as "editor" | "viewer")}
+                          onChange={e => handleRoleChange(m, e.target.value as ProjectRole)}
+                          style={m.role === "owner" ? { borderColor: PROJECT_ROLE_COLORS.owner, color: PROJECT_ROLE_COLORS.owner, fontWeight: 600 } : undefined}
                         >
+                          <option value="owner">Dueño</option>
                           <option value="editor">Project Manager</option>
                           <option value="viewer">Colaborador</option>
                         </select>
@@ -253,7 +269,7 @@ export function PermissionsView({ project, projectId, myRole, onSelectView }: Pe
                           color: PROJECT_ROLE_COLORS[m.role],
                         }}
                       >
-                        {m.role === "editor" ? "Project Manager" : "Colaborador"}
+                        {m.role === "owner" ? "Dueño" : m.role === "editor" ? "Project Manager" : "Colaborador"}
                       </span>
                     )}
                   </td>
