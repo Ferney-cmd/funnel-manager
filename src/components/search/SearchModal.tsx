@@ -63,14 +63,18 @@ export default function SearchModal({ projects, onClose, onOpenProject }: Search
         projectName: p.name,
       }))
 
-      const taskResults: SearchResult[] = (tasksRes.data ?? []).map((t: { id: string; text: string; project_id: string; projects: { name: string } | null }) => ({
-        type: "task" as const,
-        id: t.id,
-        title: t.text,
-        subtitle: (t.projects as { name: string } | null)?.name ?? "",
-        projectId: t.project_id,
-        projectName: (t.projects as { name: string } | null)?.name ?? "",
-      }))
+      const taskResults: SearchResult[] = (tasksRes.data ?? []).map((t) => {
+        // Supabase returns the related projects row as an array or single object
+        const proj = Array.isArray(t.projects) ? t.projects[0] : t.projects
+        return {
+          type: "task" as const,
+          id: t.id as string,
+          title: t.text as string,
+          subtitle: (proj as { name: string } | null)?.name ?? "",
+          projectId: t.project_id as string,
+          projectName: (proj as { name: string } | null)?.name ?? "",
+        }
+      })
 
       setResults([...projectResults, ...taskResults])
       setSelected(0)
