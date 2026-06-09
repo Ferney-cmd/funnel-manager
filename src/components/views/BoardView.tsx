@@ -409,6 +409,32 @@ export function BoardView({
     </div>
   );
 
+  /* ── Export CSV ── */
+  function exportCSV() {
+    const rows: string[][] = [["Módulo", "Tarea", "Responsable", "Fecha límite", "Prioridad", "Estado"]];
+    for (const node of nodes) {
+      for (const task of node.data.tasks) {
+        const assignee = members.find((m) => m.id === task.assignedTo)?.full_name ?? "";
+        rows.push([
+          node.data.title,
+          task.text,
+          assignee,
+          task.dueDate ?? "",
+          task.priority ?? "normal",
+          task.done ? "Completada" : "Pendiente",
+        ]);
+      }
+    }
+    const csv = rows.map((r) => r.map((c) => `"${c.replace(/"/g, '""')}"`).join(",")).join("\n");
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${project?.name ?? "tablero"}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   const totalTasks = nodes.reduce((a, n) => a + n.data.tasks.length, 0);
   const doneTasks  = nodes.reduce((a, n) => a + n.data.tasks.filter((t) => t.done).length, 0);
   const pct = totalTasks > 0 ? Math.round((doneTasks / totalTasks) * 100) : 0;
@@ -868,6 +894,16 @@ export function BoardView({
             </div>
           )}
         </div>
+
+        {/* Export CSV */}
+        <button
+          className="lt-tool-btn"
+          onClick={exportCSV}
+          title="Exportar tareas a CSV"
+          style={{ marginLeft: "auto" }}
+        >
+          ⬇ CSV
+        </button>
       </div>
 
       {/* ── Column headers ── */}

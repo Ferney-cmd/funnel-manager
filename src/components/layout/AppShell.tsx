@@ -23,6 +23,7 @@ import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
 import { NotificationsPanel } from "@/components/views/NotificationsPanel";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
+import SearchModal         from "@/components/search/SearchModal";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
@@ -76,6 +77,7 @@ export function AppShell() {
   const [loadingComments,  setLoadingComments]   = useState<Record<string, boolean>>({});
   const [notifOpen,        setNotifOpen]         = useState(false);
   const [unreadCount,      setUnreadCount]       = useState(0);
+  const [searchOpen,       setSearchOpen]        = useState(false);
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
@@ -98,6 +100,18 @@ export function AppShell() {
   useEffect(() => {
     if (typeof window !== "undefined") localStorage.setItem("fm_lastView", activeView);
   }, [activeView]);
+
+  /* ── Ctrl+K / Cmd+K → open search ──────────────────────────── */
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        setSearchOpen(true);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   /* ── Load profile + projects on mount ───────────────────────── */
   useEffect(() => {
@@ -1773,6 +1787,18 @@ export function AppShell() {
         onClose={() => setNotifOpen(false)}
         me={me}
       />
+
+      {searchOpen && (
+        <SearchModal
+          projects={projects}
+          onClose={() => setSearchOpen(false)}
+          onOpenProject={(projectId, view) => {
+            setActiveProjectId(projectId);
+            setActiveView(view ?? "canvas");
+            setSearchOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 }

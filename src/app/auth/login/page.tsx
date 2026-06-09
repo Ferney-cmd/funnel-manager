@@ -3,6 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
@@ -115,6 +116,14 @@ export default function LoginPage() {
             {loading ? "Cargando..." : mode === "login" ? "Entrar" : "Crear cuenta"}
           </button>
         </form>
+
+        {mode === "login" && (
+          <p className="login-switch" style={{ marginTop: 8 }}>
+            <Link href="/auth/forgot-password" style={{ color: "var(--text2)", fontSize: 12.5 }}>
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </p>
+        )}
 
         <p className="login-switch">
           {mode === "login" ? "¿No tienes cuenta?" : "¿Ya tienes cuenta?"}{" "}

@@ -41,6 +41,7 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
   const [inviteEmail,   setInviteEmail]   = useState("");
   const [inviteRole,    setInviteRole]    = useState<"editor" | "viewer">("editor");
   const [inviting,      setInviting]      = useState(false);
+  const [inviteMsg,     setInviteMsg]     = useState<{ ok: boolean; text: string } | null>(null);
 
   async function loadData() {
     setLoading(true);
@@ -136,9 +137,10 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
 
   async function inviteByEmail(rawEmail: string, role: "editor" | "viewer") {
     const email = rawEmail.trim().toLowerCase();
-    if (!email.includes("@")) { alert("Introduce un email válido."); return; }
+    if (!email.includes("@")) { setInviteMsg({ ok: false, text: "Introduce un email válido." }); return; }
 
     setInviting(true);
+    setInviteMsg(null);
     try {
       // Look up an existing profile with that email (case-insensitive).
       const { data: existing } = await supabase
@@ -150,26 +152,43 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
           project_id: projectId, user_id: existing.id, role, invited_by: currentUid,
         });
         if (error) {
-          if (error.code === "23505") { alert("Ya es miembro del proyecto."); }
-          else { alert("No se pudo agregar: " + error.message); }
+          const msg = error.code === "23505" ? "Ya es miembro del proyecto." : "No se pudo agregar: " + error.message;
+          setInviteMsg({ ok: false, text: msg });
           return;
         }
         setInviteEmail("");
+        setInviteMsg({ ok: true, text: "✅ Miembro agregado al proyecto." });
         loadData();
         return;
       }
 
-      // No profile yet → create a pending invitation.
+      // No profile yet → create a pending invitation in DB.
       const { error } = await supabase.from("invitations").insert({
         project_id: projectId, email, role, invited_by: currentUid, status: "pending",
       });
       if (error) {
-        if (error.code === "23505") { alert("Ya existe una invitación pendiente para ese email."); }
-        else { alert("No se pudo invitar: " + error.message); }
+        const msg = error.code === "23505" ? "Ya existe una invitación pendiente para ese email." : "No se pudo invitar: " + error.message;
+        setInviteMsg({ ok: false, text: msg });
         return;
       }
-      alert("Invitación pendiente enviada. " +
-        "La persona obtendrá acceso automáticamente cuando se registre con ese email.");
+
+      // Also call the API route to send invitation email via Supabase Auth.
+      try {
+        const apiRes = await fetch("/api/invite", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, role, projectId, inviterName: "" }),
+        });
+        const apiData = await apiRes.json();
+        if (apiData.emailSent) {
+          setInviteMsg({ ok: true, text: "✅ Invitación enviada por email." });
+        } else {
+          setInviteMsg({ ok: true, text: "✅ Invitación guardada. Se agregará automáticamente cuando se registre." });
+        }
+      } catch {
+        setInviteMsg({ ok: true, text: "✅ Invitación guardada. Se agregará automáticamente cuando se registre." });
+      }
+
       setInviteEmail("");
       loadData();
     } finally {
@@ -243,6 +262,16 @@ export function TeamModal({ projectId, onClose }: TeamModalProps) {
                 <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>
                   Puedes invitar a personas aunque todavía no tengan cuenta.
                 </div>
+                {inviteMsg && (
+                  <div style={{
+                    marginTop: 8, padding: "6px 10px", borderRadius: 6, fontSize: 12,
+                    background: inviteMsg.ok ? "#10B98115" : "#DC262615",
+                    color: inviteMsg.ok ? "#10B981" : "#DC2626",
+                    border: `1px solid ${inviteMsg.ok ? "#10B98130" : "#DC262630"}`,
+                  }}>
+                    {inviteMsg.text}
+                  </div>
+                )}
 
                 <div className="modal-section-label" style={{ marginTop: 16 }}>
                   Buscar usuario existente
