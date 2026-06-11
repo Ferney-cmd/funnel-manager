@@ -33,12 +33,12 @@ Responde solo con el resumen en texto plano, sin formato JSON ni encabezados.`;
     });
     if (!r.ok) {
       const t = await r.text();
-      return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) }, { status: 502 });
+      return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) });
     }
     const data = await r.json();
     const summary = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
     return NextResponse.json({ summary });
   } catch (e: any) {
-    return NextResponse.json({ error: "FETCH_FAILED", detail: String(e).slice(0,200) }, { status: 502 });
+    return NextResponse.json({ error: "FETCH_FAILED", detail: String(e).slice(0,200) });
   }
 }

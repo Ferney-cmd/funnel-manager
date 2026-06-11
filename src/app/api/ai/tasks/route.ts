@@ -37,7 +37,7 @@ Máximo 8 tareas. En español. No repitas tareas existentes.`;
     });
     if (!r.ok) {
       const t = await r.text();
-      return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) }, { status: 502 });
+      return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) });
     }
     const data = await r.json();
     const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
@@ -54,6 +54,6 @@ Máximo 8 tareas. En español. No repitas tareas existentes.`;
       .map((t) => ({ text: t.text.trim().slice(0, 200), priority: valid.includes(t.priority as string) ? t.priority : "normal" }));
     return NextResponse.json({ tasks });
   } catch (e: any) {
-    return NextResponse.json({ error: "FETCH_FAILED", detail: String(e).slice(0,200) }, { status: 502 });
+    return NextResponse.json({ error: "FETCH_FAILED", detail: String(e).slice(0,200) });
   }
 }
