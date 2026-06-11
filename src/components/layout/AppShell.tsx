@@ -24,6 +24,7 @@ import { PermissionsView } from "@/components/views/PermissionsView";
 import { NotificationsPanel } from "@/components/views/NotificationsPanel";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
 import SearchModal         from "@/components/search/SearchModal";
+import { CopilotPanel }    from "@/components/copilot/CopilotPanel";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
@@ -78,6 +79,7 @@ export function AppShell() {
   const [notifOpen,        setNotifOpen]         = useState(false);
   const [unreadCount,      setUnreadCount]       = useState(0);
   const [searchOpen,       setSearchOpen]        = useState(false);
+  const [copilotOpen,      setCopilotOpen]       = useState(false);
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
@@ -1594,6 +1596,8 @@ export function AppShell() {
         me={me}
         onOpenProfile={() => setProfileOpen(true)}
         isAdmin={isPlatformAdmin(me)}
+        onOpenCopilot={() => setCopilotOpen((v) => !v)}
+        copilotOpen={copilotOpen}
       />
       <Topbar
         projectId={activeProjectId}
@@ -1799,6 +1803,14 @@ export function AppShell() {
           }}
         />
       )}
+
+      <CopilotPanel
+        open={copilotOpen}
+        projectId={activeProjectId}
+        projectName={activeProject?.name ?? ""}
+        onClose={() => setCopilotOpen(false)}
+        onActionsApplied={() => loadProjectData(activeProjectId)}
+      />
     </div>
   );
 }

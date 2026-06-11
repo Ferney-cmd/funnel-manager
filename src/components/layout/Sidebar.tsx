@@ -19,6 +19,8 @@ interface SidebarProps {
   me:              Profile | null;
   onOpenProfile:   () => void;
   isAdmin:         boolean;
+  onOpenCopilot:   () => void;
+  copilotOpen:     boolean;
 }
 
 const BASE_VIEWS = [
@@ -42,6 +44,7 @@ export function Sidebar({
   onNewProject, onNewSubproject, onDeleteProject,
   onAddModule, onAddZone, onLogout,
   me, onOpenProfile, isAdmin,
+  onOpenCopilot, copilotOpen,
 }: SidebarProps) {
 
   /* Organiza proyectos en root + subproyectos */
@@ -155,7 +158,10 @@ export function Sidebar({
 
       {/* AI Copilot */}
       <div className="sidebar-section">
-        <button className="sidebar-item">
+        <button
+          className={`sidebar-item ${copilotOpen ? "active" : ""}`}
+          onClick={onOpenCopilot}
+        >
           <span className="sidebar-item-icon" style={{ color: "#8B5CF6" }}>✦</span>
           <span>IA Copilot</span>
           <span style={{ width: 6, height: 6, borderRadius: "50%",
