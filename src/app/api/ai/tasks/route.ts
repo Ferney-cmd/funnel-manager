@@ -3,10 +3,10 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-3-5-sonnet-20241022";
+const MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash";
 
 export async function POST(req: Request) {
-  const key = process.env.ANTHROPIC_API_KEY;
+  const key = process.env.GEMINI_API_KEY;
   if (!key) return NextResponse.json({ error: "AI_NOT_CONFIGURED" });
 
   let body: any;
@@ -23,26 +23,24 @@ Devuelve SOLO un JSON válido con esta forma exacta, sin texto adicional:
 Máximo 8 tareas. En español. No repitas tareas existentes.`;
 
   try {
-    const r = await fetch("https://api.anthropic.com/v1/messages", {
+    const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`, {
       method: "POST",
       headers: {
         "content-type": "application/json",
-        "x-api-key": key,
-        "anthropic-version": "2023-06-01",
+        "x-goog-api-key": key,
       },
       body: JSON.stringify({
-        model: MODEL,
-        max_tokens: 1024,
-        system,
-        messages: [{ role: "user", content: prompt }],
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: prompt }] }],
+        generationConfig: { maxOutputTokens: 1024, responseMimeType: "application/json" },
       }),
     });
     if (!r.ok) {
       const t = await r.text();
-      return NextResponse.json({ error: "ANTHROPIC_ERROR", detail: t.slice(0, 300) }, { status: 502 });
+      return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) }, { status: 502 });
     }
     const data = await r.json();
-    const text = (data?.content?.[0]?.text ?? "").trim();
+    const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
     // Extraer el primer bloque JSON
     const match = text.match(/\{[\s\S]*\}/);
     let tasks: { text: string; priority?: string }[] = [];

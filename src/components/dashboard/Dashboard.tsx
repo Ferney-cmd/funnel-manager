@@ -69,7 +69,7 @@ export function Dashboard({ project, nodes, members, onSelectView }: DashboardPr
       const data = await res.json();
       if (data.error) {
         if (data.error === "AI_NOT_CONFIGURED") {
-          setAiError("⚠ La IA no está configurada. Configura ANTHROPIC_API_KEY en EasyPanel.");
+          setAiError("⚠ La IA no está configurada. Configura GEMINI_API_KEY en EasyPanel.");
         } else {
           setAiError(data.error as string);
         }
