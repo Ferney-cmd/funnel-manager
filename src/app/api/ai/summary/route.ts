@@ -36,7 +36,12 @@ Responde solo con el resumen en texto plano, sin formato JSON ni encabezados.`;
       return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) });
     }
     const data = await r.json();
-    const summary = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
+    // Gemini puede dividir la respuesta en varios parts: unirlos todos
+    const allParts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
+    const summary = allParts.map((p) => p?.text ?? "").join("").trim();
+    if (!summary) {
+      console.error("ai/summary vacío. Respuesta:", JSON.stringify(data).slice(0, 600));
+    }
     return NextResponse.json({ summary });
   } catch (e: any) {
     return NextResponse.json({ error: "FETCH_FAILED", detail: String(e).slice(0,200) });

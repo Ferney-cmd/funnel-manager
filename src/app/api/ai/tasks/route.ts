@@ -40,12 +40,21 @@ Máximo 8 tareas. En español. No repitas tareas existentes.`;
       return NextResponse.json({ error: "GEMINI_ERROR", detail: t.slice(0, 300) });
     }
     const data = await r.json();
-    const text = (data?.candidates?.[0]?.content?.parts?.[0]?.text ?? "").trim();
-    // Extraer el primer bloque JSON
-    const match = text.match(/\{[\s\S]*\}/);
+    // Gemini puede dividir la respuesta en varios parts: unirlos todos
+    const allParts: any[] = data?.candidates?.[0]?.content?.parts ?? [];
+    const text = allParts.map((p) => p?.text ?? "").join("").trim();
     let tasks: { text: string; priority?: string }[] = [];
-    if (match) {
-      try { tasks = (JSON.parse(match[0]).tasks ?? []); } catch {}
+    try {
+      const parsed = JSON.parse(text);
+      tasks = Array.isArray(parsed) ? parsed : (parsed?.tasks ?? []);
+    } catch {
+      const match = text.match(/\{[\s\S]*\}/);
+      if (match) {
+        try { tasks = (JSON.parse(match[0]).tasks ?? []); } catch {}
+      }
+    }
+    if (!tasks.length) {
+      console.error("ai/tasks sin tareas parseables. Respuesta:", JSON.stringify(data).slice(0, 600));
     }
     const valid = ["low","normal","high","urgent"];
     tasks = tasks
