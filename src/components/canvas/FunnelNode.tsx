@@ -606,7 +606,8 @@ function TaskRow({ task, roleColor, onToggle, onDelete }: {
             style={{ flexShrink: 0, fontSize: 9, lineHeight: "14px", marginTop: 1,
               color: showDesc ? roleColor : "var(--text3)",
               cursor: "pointer", padding: "0 2px", borderRadius: 3,
-              transition: "color 0.12s" }}
+              marginRight: hovered && !showAlert ? 18 : 0,
+              transition: "color 0.12s, margin-right 0.12s" }}
             onMouseEnter={(e) => (e.currentTarget.style.color = roleColor)}
             onMouseLeave={(e) => (e.currentTarget.style.color = showDesc ? roleColor : "var(--text3)")}
           >
