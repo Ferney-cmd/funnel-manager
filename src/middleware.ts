@@ -25,9 +25,14 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch {
+    // Cookie corrupta o Supabase caído: tratar como sesión inválida en vez de romper la petición
+    user = null;
+  }
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
 
