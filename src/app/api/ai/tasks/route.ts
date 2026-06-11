@@ -32,7 +32,7 @@ Máximo 8 tareas. En español. No repitas tareas existentes.`;
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 1024, responseMimeType: "application/json" },
+        generationConfig: { maxOutputTokens: 2048, responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
     if (!r.ok) {

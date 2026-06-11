@@ -28,7 +28,7 @@ Responde solo con el resumen en texto plano, sin formato JSON ni encabezados.`;
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: system }] },
         contents: [{ role: "user", parts: [{ text: JSON.stringify(stats) }] }],
-        generationConfig: { maxOutputTokens: 600 },
+        generationConfig: { maxOutputTokens: 1024, thinkingConfig: { thinkingBudget: 0 } },
       }),
     });
     if (!r.ok) {
