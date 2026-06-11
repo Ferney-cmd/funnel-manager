@@ -566,60 +566,94 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function TaskRow({ task, roleColor, onToggle, onDelete }: {
   task: NodeTask; roleColor: string; onToggle: () => void; onDelete: () => void;
 }) {
-  const [hovered, setHovered] = useState(false);
+  const [hovered,  setHovered]  = useState(false);
+  const [showDesc, setShowDesc] = useState(false);
   const alert = computeTaskAlertStatus(task);
   const showAlert = !task.done && task.dueDate && alert !== "no_date" && alert !== "on_track";
   const ac = showAlert ? ALERT_COLORS[alert] : null;
+  const hasDesc = !!task.description?.trim();
 
   return (
-    <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-      style={{ display: "flex", alignItems: "flex-start", gap: 6,
-        padding: "3px 0", cursor: "pointer", position: "relative" }}>
-      {/* Checkbox */}
+    <div style={{ display: "flex", flexDirection: "column" }}>
       <div
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        style={{ width: 13, height: 13, borderRadius: 3, flexShrink: 0, marginTop: 1,
-          border: task.done ? "none" : "1.5px solid var(--border2)",
-          background: task.done ? roleColor : "transparent",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          transition: "background 0.15s" }}>
-        {task.done && <span style={{ color: "#fff", fontSize: 8, lineHeight: 1 }}>✓</span>}
-      </div>
-      {/* Text */}
-      <span
-        onClick={(e) => { e.stopPropagation(); onToggle(); }}
-        style={{ flex: 1, fontSize: 11, lineHeight: 1.4,
-          color: task.done ? "var(--text3)" : "var(--text)",
-          textDecoration: task.done ? "line-through" : "none" }}>
-        {task.text}
-      </span>
-      {/* Alert badge */}
-      {showAlert && ac && (
-        <span
-          className={`task-alert-badge task-alert-${alert}`}
-          title={`Fecha límite: ${task.dueDate}`}
-          style={{ background: ac.bg, color: ac.fg, marginRight: hovered ? 18 : 0 }}>
-          {ac.label}
-        </span>
-      )}
-      {/* Delete button — visible on hover */}
-      {hovered && (
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(); }}
-          title="Eliminar tarea"
-          style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
-            width: 14, height: 14, borderRadius: 3, border: "none",
-            background: "var(--border2)", color: "var(--text2)",
-            fontSize: 8, lineHeight: 1, cursor: "pointer", padding: 0,
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{ display: "flex", alignItems: "flex-start", gap: 6,
+          padding: "3px 0", cursor: "pointer", position: "relative" }}>
+        {/* Checkbox */}
+        <div
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          style={{ width: 13, height: 13, borderRadius: 3, flexShrink: 0, marginTop: 1,
+            border: task.done ? "none" : "1.5px solid var(--border2)",
+            background: task.done ? roleColor : "transparent",
             display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.12s" }}
-          onMouseEnter={(e) => (e.currentTarget.style.background = "#E24B4A")}
-          onMouseLeave={(e) => (e.currentTarget.style.background = "var(--border2)")}
-        >
-          ✕
-        </button>
+            transition: "background 0.15s" }}>
+          {task.done && <span style={{ color: "#fff", fontSize: 8, lineHeight: 1 }}>✓</span>}
+        </div>
+        {/* Text */}
+        <span
+          onClick={(e) => { e.stopPropagation(); onToggle(); }}
+          style={{ flex: 1, fontSize: 11, lineHeight: 1.4,
+            color: task.done ? "var(--text3)" : "var(--text)",
+            textDecoration: task.done ? "line-through" : "none" }}>
+          {task.text}
+        </span>
+        {/* Details indicator — solo si la tarea tiene descripción */}
+        {hasDesc && (
+          <span
+            onClick={(e) => { e.stopPropagation(); setShowDesc((s) => !s); }}
+            title={showDesc ? "Ocultar detalles" : "Ver detalles"}
+            style={{ flexShrink: 0, fontSize: 9, lineHeight: "14px", marginTop: 1,
+              color: showDesc ? roleColor : "var(--text3)",
+              cursor: "pointer", padding: "0 2px", borderRadius: 3,
+              transition: "color 0.12s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = roleColor)}
+            onMouseLeave={(e) => (e.currentTarget.style.color = showDesc ? roleColor : "var(--text3)")}
+          >
+            ≡
+          </span>
+        )}
+        {/* Alert badge */}
+        {showAlert && ac && (
+          <span
+            className={`task-alert-badge task-alert-${alert}`}
+            title={`Fecha límite: ${task.dueDate}`}
+            style={{ background: ac.bg, color: ac.fg, marginRight: hovered ? 18 : 0 }}>
+            {ac.label}
+          </span>
+        )}
+        {/* Delete button — visible on hover */}
+        {hovered && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onDelete(); }}
+            title="Eliminar tarea"
+            style={{ position: "absolute", right: 0, top: "50%", transform: "translateY(-50%)",
+              width: 14, height: 14, borderRadius: 3, border: "none",
+              background: "var(--border2)", color: "var(--text2)",
+              fontSize: 8, lineHeight: 1, cursor: "pointer", padding: 0,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.12s" }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = "#E24B4A")}
+            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--border2)")}
+          >
+            ✕
+          </button>
+        )}
+      </div>
+
+      {/* Descripción expandida — no invasiva, colapsada por defecto */}
+      {hasDesc && showDesc && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onMouseDown={(e) => e.stopPropagation()}
+          style={{ margin: "1px 0 4px 19px", padding: "5px 8px",
+            fontSize: 10, lineHeight: 1.5, color: "var(--text2)",
+            background: "var(--surface2)", borderLeft: `2px solid ${roleColor}55`,
+            borderRadius: "0 5px 5px 0", whiteSpace: "pre-wrap",
+            wordBreak: "break-word", userSelect: "text",
+            maxHeight: 140, overflowY: "auto" }}>
+          {task.description}
+        </div>
       )}
     </div>
   );
