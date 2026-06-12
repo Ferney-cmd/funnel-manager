@@ -1,6 +1,8 @@
 # ── Stage 1: instalar dependencias ──────────────────────────────
 FROM node:20-alpine AS deps
-RUN apk add --no-cache libc6-compat
+# libc6-compat es opcional (precaución para binarios SWC); si el CDN de Alpine
+# falla no debe tumbar el build — el deploy completo dependía de ese CDN.
+RUN apk add --no-cache libc6-compat || echo "AVISO: apk fallo, continuando sin libc6-compat"
 WORKDIR /app
 COPY package.json package-lock.json* ./
 RUN npm ci
