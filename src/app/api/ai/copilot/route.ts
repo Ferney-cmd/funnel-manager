@@ -283,6 +283,18 @@ export async function POST(req: Request) {
   const history: { role: string; text: string }[] = Array.isArray(body?.messages) ? body.messages.slice(-20) : [];
   if (!projectId || !history.length) return NextResponse.json({ error: "BAD_REQUEST" }, { status: 400 });
 
+  // Archivos adjuntos al último mensaje del usuario: { name, mimeType, data(base64) }
+  const rawFiles: { name: string; mimeType: string; data: string }[] =
+    Array.isArray(body?.files) ? body.files.slice(0, 8) : [];
+  let totalBytes = 0;
+  for (const f of rawFiles) {
+    const bytes = Math.ceil((f?.data?.length ?? 0) * 0.75);
+    totalBytes += bytes;
+    if (bytes > 12 * 1024 * 1024 || totalBytes > 16 * 1024 * 1024) {
+      return NextResponse.json({ error: "FILE_TOO_LARGE", detail: "Cada archivo debe pesar menos de 12 MB (16 MB en total)." });
+    }
+  }
+
   const supabase = createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -324,12 +336,46 @@ REGLAS:
 4. Asigna responsables usando los nombres de los miembros reales del proyecto. Si el módulo ya tiene responsable, asigna sus tareas a esa persona salvo que el usuario indique otra cosa. Si no hay un responsable claro, deja la tarea sin asignar y dilo.
 5. Sé concreto y ejecutivo: tareas accionables, prioridades sensatas, fechas solo si el usuario las menciona o se deducen.
 6. Responde SIEMPRE en español, breve y claro. Al final de tu respuesta resume qué hiciste (qué creaste, qué asignaste) o qué encontraste. Usa viñetas si ayuda.
-7. Si la petición es ambigua, haz lo razonable y explica tu decisión; pregunta solo si es imposible decidir.`;
+7. Si la petición es ambigua, haz lo razonable y explica tu decisión; pregunta solo si es imposible decidir.
+8. El usuario puede adjuntar archivos (documentos, código, CSV, PDFs, imágenes, audio, video). Analízalos como contexto: extrae requerimientos, tareas, datos o lo que pidan sobre ellos. Si de un archivo se derivan tareas o módulos, propónlos o créalos según lo que pida el usuario.`;
 
   const contents: any[] = history.map((m) => ({
     role: m.role === "model" ? "model" : "user",
     parts: [{ text: String(m.text).slice(0, 4000) }],
   }));
+
+  // Adjunta los archivos al último mensaje del usuario.
+  // Imagen / audio / video / PDF → multimodal nativo de Gemini (inlineData).
+  // Cualquier otra extensión → se intenta leer como texto y se inyecta como contexto.
+  if (rawFiles.length && contents.length) {
+    const last = contents[contents.length - 1];
+    if (last.role === "user") {
+      for (const f of rawFiles) {
+        const name = String(f.name ?? "archivo").slice(0, 120);
+        const mime = String(f.mimeType ?? "").toLowerCase();
+        const native = mime.startsWith("image/") || mime.startsWith("audio/") ||
+                       mime.startsWith("video/") || mime === "application/pdf";
+        if (native) {
+          last.parts.push({ text: `\n[Archivo adjunto: ${name}]` });
+          last.parts.push({ inlineData: { mimeType: mime, data: f.data } });
+          continue;
+        }
+        try {
+          const buf = Buffer.from(f.data, "base64");
+          const text = buf.toString("utf8");
+          // Heurística: si hay demasiados caracteres de reemplazo o nulos, es binario ilegible
+          const bad = (text.match(/[\uFFFD\u0000]/g) ?? []).length;
+          if (text.length === 0 || bad / text.length > 0.05) {
+            last.parts.push({ text: `\n[Archivo adjunto "${name}" (${mime || "tipo desconocido"}): es un binario que no puedo leer directamente. Dile al usuario que lo exporte como PDF o texto.]` });
+          } else {
+            last.parts.push({ text: `\n--- ARCHIVO ADJUNTO: ${name} ---\n${text.slice(0, 150000)}\n--- FIN DE ${name} ---` });
+          }
+        } catch {
+          last.parts.push({ text: `\n[Archivo adjunto "${name}": no se pudo procesar.]` });
+        }
+      }
+    }
+  }
 
   try {
     for (let step = 0; step < MAX_STEPS; step++) {

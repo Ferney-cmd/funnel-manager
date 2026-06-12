@@ -5140,3 +5140,73 @@ body {
 @media (max-width: 768px) {
   .copilot-panel { width: 100vw; max-width: 100vw; }
 }
+
+/* ── Copilot: archivos adjuntos ─────────────────────────────── */
+.copilot-files-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 14px 0;
+  align-items: center;
+}
+.copilot-file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 8px;
+  font-size: 11.5px;
+  color: var(--text2);
+}
+.copilot-file-icon { font-size: 12px; flex-shrink: 0; }
+.copilot-file-name {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.copilot-file-remove {
+  background: transparent;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 10px;
+  padding: 0 2px;
+  flex-shrink: 0;
+}
+.copilot-file-remove:hover { color: #E24B4A; }
+.copilot-file-error { font-size: 11px; color: #E24B4A; }
+
+.copilot-attach {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  border: 1px solid var(--border);
+  background: var(--surface3);
+  color: var(--text2);
+  font-size: 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.copilot-attach:hover { border-color: var(--brand); color: var(--text); }
+.copilot-attach:disabled { opacity: .4; cursor: default; }
+
+.copilot-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+  justify-content: flex-end;
+}
+.copilot-msg-ai .copilot-attachments { justify-content: flex-start; }
+.copilot-attachment {
+  font-size: 10.5px;
+  color: var(--text3);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 7px;
+}
