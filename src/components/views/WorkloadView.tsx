@@ -3,15 +3,18 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getInitials } from "@/lib/profiles";
+import type { Project } from "@/lib/types";
 
 interface WorkloadViewProps {
   onSelectView: (view: string) => void;
+  projects?: Project[];
 }
 
 interface RawTask {
   assigned_to: string;
   done: boolean;
   due_date: string | null;
+  project_id: string | null;
 }
 
 interface PersonProfile {
@@ -42,10 +45,11 @@ function toDateStr(d: Date): string {
   return d.toISOString().slice(0, 10);
 }
 
-export function WorkloadView({ onSelectView }: WorkloadViewProps) {
+export function WorkloadView({ onSelectView, projects = [] }: WorkloadViewProps) {
   const [tasks, setTasks] = useState<RawTask[]>([]);
   const [profiles, setProfiles] = useState<PersonProfile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [filterProject, setFilterProject] = useState<string>("");  // "" = todos
 
   useEffect(() => {
     let cancelled = false;
@@ -54,7 +58,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
     (async () => {
       const { data: taskData } = await supabase
         .from("node_tasks")
-        .select("assigned_to, done, due_date")
+        .select("assigned_to, done, due_date, project_id")
         .not("assigned_to", "is", null);
       if (cancelled) return;
 
@@ -62,6 +66,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
         assigned_to: r.assigned_to,
         done: !!r.done,
         due_date: r.due_date ?? null,
+        project_id: r.project_id ?? null,
       }));
 
       const ids = Array.from(new Set(rawTasks.map((t) => t.assigned_to)));
@@ -104,6 +109,7 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
     const aggById = new Map<string, Agg>();
     for (const t of tasks) {
       if (!t.assigned_to) continue;
+      if (filterProject && t.project_id !== filterProject) continue;
       let agg = aggById.get(t.assigned_to);
       if (!agg) {
         agg = { total: 0, pending: 0, overdue: 0, dueThisWeek: 0, done: 0 };
@@ -151,7 +157,31 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
       summary: { people: builtRows.length, totalPending, totalOverdue },
       maxPending: max,
     };
-  }, [tasks, profiles]);
+  }, [tasks, profiles, filterProject]);
+
+  /* Filtro de proyecto reutilizable (se muestra siempre que haya proyectos) */
+  const projectFilterBar = projects.length > 0 ? (
+    <div className="wl-filter-bar">
+      <span className="wl-filter-label">Proyecto:</span>
+      <select
+        className="wl-filter-select"
+        value={filterProject}
+        onChange={(e) => setFilterProject(e.target.value)}
+      >
+        <option value="">Todos los proyectos</option>
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.parentProjectId ? "↳ " : ""}{p.name}
+          </option>
+        ))}
+      </select>
+      {filterProject && (
+        <button className="wl-filter-clear" onClick={() => setFilterProject("")}>
+          ✕ Limpiar
+        </button>
+      )}
+    </div>
+  ) : null;
 
   if (loading) {
     return (
@@ -172,7 +202,12 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
           <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <span className="view-back-title">Carga del equipo</span>
         </div>
-        <div className="wl-empty">Nadie tiene tareas asignadas todavía.</div>
+        {projectFilterBar}
+        <div className="wl-empty">
+          {filterProject
+            ? "Nadie tiene tareas asignadas en este proyecto."
+            : "Nadie tiene tareas asignadas todavía."}
+        </div>
       </div>
     );
   }
@@ -183,6 +218,8 @@ export function WorkloadView({ onSelectView }: WorkloadViewProps) {
         <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
         <span className="view-back-title">Carga del equipo</span>
       </div>
+
+      {projectFilterBar}
 
       <div className="wl-summary">
         <div className="pf-chip">

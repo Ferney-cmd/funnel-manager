@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { PROJECT_STATUSES } from "@/lib/constants";
 import { getInitials, type Profile } from "@/lib/profiles";
 import type { Project } from "@/lib/types";
@@ -57,8 +58,36 @@ export function Sidebar({
     return acc;
   }, {});
 
-  const renderProjectRow = (p: Project, isSub = false) => (
+  /* Colapsar / expandir el árbol de subproyectos (persistente) */
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    try {
+      const raw = typeof window !== "undefined" ? localStorage.getItem("fm_sidebarCollapsed") : null;
+      if (raw) setCollapsed(JSON.parse(raw));
+    } catch { /* ignore */ }
+  }, []);
+  const toggleCollapse = (id: string) => {
+    setCollapsed((prev) => {
+      const next = { ...prev, [id]: !prev[id] };
+      try { localStorage.setItem("fm_sidebarCollapsed", JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  };
+
+  const renderProjectRow = (p: Project, isSub = false, hasChildren = false, isCollapsed = false) => (
     <div key={p.id} className={`sidebar-project-row ${isSub ? "sidebar-subproject-row" : ""}`}>
+      {/* Chevron de expandir/colapsar — solo en proyectos con subproyectos */}
+      {hasChildren ? (
+        <button
+          className="sidebar-tree-toggle"
+          title={isCollapsed ? "Mostrar subproyectos" : "Ocultar subproyectos"}
+          onClick={(e) => { e.stopPropagation(); toggleCollapse(p.id); }}
+        >
+          {isCollapsed ? "▸" : "▾"}
+        </button>
+      ) : (
+        !isSub && <span className="sidebar-tree-spacer" />
+      )}
       <button
         className={`sidebar-item sidebar-project-btn ${p.id === activeProjectId ? "active" : ""}`}
         onClick={() => onSelectProject(p.id)}
@@ -68,6 +97,11 @@ export function Sidebar({
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
           {p.name}
         </span>
+        {hasChildren && (
+          <span className="sidebar-subcount" title={`${subprojectsByParent[p.id].length} subproyecto(s)`}>
+            {subprojectsByParent[p.id].length}
+          </span>
+        )}
       </button>
       <button
         className="sidebar-delete-btn"
@@ -91,12 +125,18 @@ export function Sidebar({
       {/* Projects */}
       <div className="sidebar-section">
         <div className="sidebar-section-label">Proyectos</div>
-        {rootProjects.map((p) => (
-          <div key={p.id}>
-            {renderProjectRow(p, false)}
-            {(subprojectsByParent[p.id] || []).map((sub) => renderProjectRow(sub, true))}
-          </div>
-        ))}
+        {rootProjects.map((p) => {
+          const children = subprojectsByParent[p.id] || [];
+          const hasChildren = children.length > 0;
+          const isCollapsed = collapsed[p.id] ?? false;
+          return (
+            <div key={p.id}>
+              {renderProjectRow(p, false, hasChildren, isCollapsed)}
+              {hasChildren && !isCollapsed &&
+                children.map((sub) => renderProjectRow(sub, true))}
+            </div>
+          );
+        })}
         {isAdmin && (
           <button className="sidebar-add-btn" onClick={onNewProject}>
             <span style={{ fontSize: 14 }}>+</span>

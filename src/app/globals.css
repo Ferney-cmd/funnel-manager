@@ -1904,10 +1904,44 @@ body {
   cursor: pointer;
 }
 .board-action-btn:hover { background: var(--surface2); }
+.board-action-btn:disabled { opacity: .4; cursor: default; }
 .board-action-btn.primary {
   background: var(--brand); color: #fff; border-color: var(--brand);
 }
 .board-action-btn.primary:hover { background: #6A2BD9; }
+
+/* ── BoardView: composer superior de tarea ── */
+.al-topadd-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.al-topadd-section {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface2);
+  color: var(--text);
+  cursor: pointer;
+  max-width: 240px;
+}
+.al-topadd-section:focus { outline: none; border-color: var(--brand); }
+.al-topadd-input {
+  flex: 1;
+  min-width: 180px;
+  background: var(--surface2);
+  border: 1.5px solid var(--brand);
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  outline: none;
+}
 
 .board-grid {
   display: grid;
@@ -2115,6 +2149,45 @@ body {
 /* ===============================================================
    SIDEBAR — Subproyectos (jerarquía visual)
    =============================================================== */
+.sidebar-tree-toggle {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--sidebar-muted, #9ca3af);
+  font-size: 9px;
+  padding: 0;
+  margin-right: 2px;
+  border-radius: 3px;
+  transition: color .12s, background .12s;
+}
+.sidebar-tree-toggle:hover {
+  color: var(--sidebar-text, #fff);
+  background: rgba(255,255,255,0.08);
+}
+.sidebar-tree-spacer {
+  flex-shrink: 0;
+  width: 16px;
+  margin-right: 2px;
+}
+.sidebar-subcount {
+  flex-shrink: 0;
+  min-width: 16px;
+  text-align: center;
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  margin-right: 22px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.1);
+  color: var(--sidebar-muted, #9ca3af);
+}
+
 .sidebar-subproject-row {
   padding-left: 12px;
 }
@@ -4209,6 +4282,39 @@ body {
   min-height: 100%;
   background: var(--bg);
 }
+.wl-filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 24px 0;
+}
+.wl-filter-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text2);
+}
+.wl-filter-select {
+  font-size: 13px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  max-width: 280px;
+}
+.wl-filter-select:focus { outline: none; border-color: var(--brand); }
+.wl-filter-clear {
+  font-size: 12px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text3);
+  cursor: pointer;
+}
+.wl-filter-clear:hover { color: var(--text); border-color: var(--text3); }
+
 .wl-summary {
   display: flex;
   gap: 12px;
@@ -5210,3 +5316,94 @@ body {
   border-radius: 6px;
   padding: 2px 7px;
 }
+
+/* ════════════════════════════════════════════════════════════════
+   DUPLICATE MODAL — duplicar proyecto con opciones
+   ════════════════════════════════════════════════════════════════ */
+.dup-modal {
+  width: 460px;
+  max-width: 94vw;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 20px 60px rgba(0,0,0,.30);
+}
+.dup-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dup-modal-title { font-size: 16px; font-weight: 700; color: var(--text); }
+.dup-modal-close {
+  background: transparent; border: none; color: var(--text3);
+  cursor: pointer; font-size: 15px; padding: 4px 6px; border-radius: 6px;
+}
+.dup-modal-close:hover { background: var(--surface2); color: var(--text); }
+.dup-modal-sub {
+  font-size: 12.5px; color: var(--text2); line-height: 1.5;
+  margin: 0 0 16px;
+}
+
+.dup-field { display: block; margin-bottom: 16px; }
+.dup-label {
+  display: block; font-size: 12px; font-weight: 600;
+  color: var(--text2); margin-bottom: 6px;
+}
+.dup-input, .dup-select {
+  width: 100%;
+  font-size: 13.5px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface2);
+  color: var(--text);
+  outline: none;
+}
+.dup-input:focus, .dup-select:focus { border-color: var(--brand); }
+.dup-select { margin-top: 8px; cursor: pointer; }
+
+.dup-options { display: flex; flex-direction: column; gap: 8px; }
+.dup-option {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.dup-option:hover { background: var(--surface2); }
+.dup-option.active { border-color: var(--brand); background: var(--brand-light, var(--surface2)); }
+.dup-option.disabled { opacity: .5; cursor: not-allowed; }
+.dup-option input { margin-top: 2px; flex-shrink: 0; accent-color: var(--brand); }
+.dup-option-title { font-size: 13px; font-weight: 600; color: var(--text); }
+.dup-option-desc { font-size: 11px; color: var(--text3); margin-top: 1px; }
+
+.dup-actions {
+  display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;
+}
+.dup-btn-cancel {
+  padding: 8px 16px; font-size: 13px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: transparent; color: var(--text2); cursor: pointer;
+}
+.dup-btn-cancel:hover { background: var(--surface2); }
+.dup-btn-confirm {
+  padding: 8px 18px; font-size: 13px; font-weight: 600;
+  border: none; border-radius: 9px;
+  background: var(--brand); color: #fff; cursor: pointer;
+}
+.dup-btn-confirm:hover { background: #6A2BD9; }
+.dup-btn-confirm:disabled { opacity: .45; cursor: default; }
+
+.dup-note {
+  margin-top: 10px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text3);
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.dup-note-warn { color: #D97706; background: #FEF3C7; }

@@ -23,6 +23,7 @@ import { AdminView }       from "@/components/views/AdminView";
 import { PermissionsView } from "@/components/views/PermissionsView";
 import { NotificationsPanel } from "@/components/views/NotificationsPanel";
 import { ProjectWizard }   from "@/components/project/ProjectWizard";
+import { DuplicateModal }  from "@/components/project/DuplicateModal";
 import SearchModal         from "@/components/search/SearchModal";
 import { CopilotPanel }    from "@/components/copilot/CopilotPanel";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
@@ -80,6 +81,7 @@ export function AppShell() {
   const [unreadCount,      setUnreadCount]       = useState(0);
   const [searchOpen,       setSearchOpen]        = useState(false);
   const [copilotOpen,      setCopilotOpen]       = useState(false);
+  const [duplicateOpen,    setDuplicateOpen]     = useState(false);
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
@@ -1325,72 +1327,82 @@ export function AppShell() {
   }, [supabase]);
 
   /* ── Duplicate project ──────────────────────────────────────── */
-  const handleDuplicate = useCallback(async () => {
+  const handleDuplicate = useCallback(async (opts: { name: string; parentProjectId: string | null }) => {
     const source = projects.find((p) => p.id === activeProjectId);
     if (!source) return;
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: newProj } = await supabase
+    const name = opts.name.trim() || `${source.name} (copia)`;
+    const { data: newProj, error: projErr } = await supabase
       .from("projects")
-      .insert({ user_id: user.id, name: `${source.name} (copia)`, client: source.client, status: "draft" })
+      .insert({
+        user_id: user.id,
+        name,
+        client: source.client,
+        status: "draft",
+        parent_project_id: opts.parentProjectId,
+      })
       .select().single();
-    if (!newProj) return;
+    if (projErr || !newProj) {
+      alert("No se pudo duplicar: " + (projErr?.message ?? "error desconocido"));
+      return;
+    }
+
+    // Lee el contenido REAL del proyecto origen desde la DB (no del estado local,
+    // que puede estar desincronizado o sin cargar) para una copia fiel.
+    const [{ data: srcNodes }, { data: srcEdges }, { data: srcZones }] = await Promise.all([
+      supabase.from("funnel_nodes")
+        .select("*, node_tasks(*)").eq("project_id", activeProjectId),
+      supabase.from("funnel_edges").select("*").eq("project_id", activeProjectId),
+      supabase.from("funnel_zones").select("*").eq("project_id", activeProjectId),
+    ]);
 
     const idMap: Record<string, string> = {};
-    const sourceNodes = nodesMap[activeProjectId] ?? [];
-    const sourceEdges = edgesMap[activeProjectId] ?? [];
-    const sourceZones = zonesMap[activeProjectId] ?? [];
-
-    for (const n of sourceNodes) {
+    for (const n of (srcNodes ?? [])) {
       const newNodeId = `node-${uid()}`;
       idMap[n.id] = newNodeId;
       await supabase.from("funnel_nodes").insert({
         id: newNodeId, project_id: newProj.id,
-        title: n.data.title, subtitle: n.data.subtitle,
-        icon: n.data.icon, role: n.data.role,
-        owner_initials: n.data.ownerInitials, owner_color: n.data.ownerColor,
-        position_x: n.position.x, position_y: n.position.y,
+        title: n.title, subtitle: n.subtitle,
+        icon: n.icon, role: n.role,
+        owner_initials: n.owner_initials, owner_color: n.owner_color,
+        assigned_to: n.assigned_to ?? null,
+        position_x: n.position_x, position_y: n.position_y,
       });
-      for (const t of n.data.tasks) {
+      const tasks = (n.node_tasks ?? []).sort((a: any, b: any) => (a.ord ?? 0) - (b.ord ?? 0));
+      for (const t of tasks) {
+        // Copia fiel (sin completar), conservando prioridad/fecha/descripción/responsable
         await supabase.from("node_tasks").insert({
-          id: `t-${uid()}`, node_id: newNodeId,
-          text: t.text, done: false, ord: t.order,
+          id: `t-${uid()}`, node_id: newNodeId, project_id: newProj.id,
+          text: t.text, done: false, ord: t.ord ?? 0,
+          priority: t.priority ?? "normal",
+          due_date: t.due_date ?? null,
+          description: t.description ?? "",
+          assigned_to: t.assigned_to ?? null,
         });
       }
     }
-    for (const e of sourceEdges) {
+    for (const e of (srcEdges ?? [])) {
       await supabase.from("funnel_edges").insert({
         id: `e-${uid()}`, project_id: newProj.id,
         source: idMap[e.source] ?? e.source,
         target: idMap[e.target] ?? e.target,
+        source_handle: e.source_handle ?? null,
+        target_handle: e.target_handle ?? null,
+        animated: e.animated ?? false,
+        dashed: e.dashed ?? false,
+        label: e.label ?? null,
       });
     }
-    for (const z of sourceZones) {
+    for (const z of (srcZones ?? [])) {
       await supabase.from("funnel_zones").insert({
         id: `zone-${uid()}`, project_id: newProj.id,
-        label: z.data.label, color: z.data.color,
-        position_x: z.position.x, position_y: z.position.y,
-        width: z.data.width, height: z.data.height,
+        label: z.label, color: z.color,
+        position_x: z.position_x, position_y: z.position_y,
+        width: z.width, height: z.height,
       });
     }
-
-    const newNodes: Node<FunnelNodeData>[] = sourceNodes.map((n) => ({
-      ...n, id: idMap[n.id], zIndex: 1,
-      data: {
-        ...n.data,
-        tasks: n.data.tasks.map((t) => ({ ...t, id: `t-${uid()}`, done: false })),
-        messages: [], hasUnread: false,
-      },
-    }));
-    const newEdges: Edge[] = sourceEdges.map((e) => ({
-      ...e, id: `e-${uid()}`,
-      source: idMap[e.source] ?? e.source,
-      target: idMap[e.target] ?? e.target,
-    }));
-    const newZones: Node<ZoneNodeData>[] = sourceZones.map((z) => ({
-      ...z, id: `zone-${uid()}`,
-    }));
 
     setProjects((prev) => [...prev, {
       id: newProj.id, name: newProj.name,
@@ -1399,15 +1411,19 @@ export function AppShell() {
       status:          newProj.status,
       progress:        0,
       blockedCount:    0,
+      ownerId:         newProj.user_id ?? null,
       parentProjectId: newProj.parent_project_id ?? null,
       startDate:       newProj.start_date ?? null,
       endDate:         newProj.end_date   ?? null,
     }]);
-    setNodesMap((prev) => ({ ...prev, [newProj.id]: newNodes }));
-    setEdgesMap((prev) => ({ ...prev, [newProj.id]: newEdges }));
-    setZonesMap((prev) => ({ ...prev, [newProj.id]: newZones }));
+    // Limpia cache para que el nuevo proyecto cargue fresco desde la DB
+    // (evita ids locales desincronizados con los insertados).
+    setNodesMap((prev) => { const n = { ...prev }; delete n[newProj.id]; return n; });
+    setEdgesMap((prev) => { const e = { ...prev }; delete e[newProj.id]; return e; });
+    setZonesMap((prev) => { const z = { ...prev }; delete z[newProj.id]; return z; });
     setActiveProjectId(newProj.id);
-  }, [activeProjectId, projects, nodesMap, edgesMap, zonesMap, supabase]);
+    setDuplicateOpen(false);
+  }, [activeProjectId, projects, supabase]);
 
   /* ── Rename project ────────────────────────────────────────── */
   const handleRenameProject = useCallback(async (projectId: string, name: string) => {
@@ -1606,7 +1622,7 @@ export function AppShell() {
         members={currentMembers}
         onlineUsers={onlineUsers}
         onRename={handleRenameProject}
-        onDuplicate={handleDuplicate}
+        onDuplicate={() => setDuplicateOpen(true)}
         onAddModule={handleAddModule}
         onOpenTeam={() => setTeamOpen(true)}
         unreadCount={unreadCount}
@@ -1706,7 +1722,7 @@ export function AppShell() {
 
       {activeView === "workload" && (
         <div className="view-scroll">
-          <WorkloadView onSelectView={setActiveView} />
+          <WorkloadView onSelectView={setActiveView} projects={projects} />
         </div>
       )}
 
@@ -1811,6 +1827,16 @@ export function AppShell() {
         onClose={() => setCopilotOpen(false)}
         onActionsApplied={() => loadProjectData(activeProjectId)}
       />
+
+      {duplicateOpen && activeProject && (
+        <DuplicateModal
+          source={activeProject}
+          projects={projects}
+          isAdmin={isPlatformAdmin(me)}
+          onClose={() => setDuplicateOpen(false)}
+          onConfirm={handleDuplicate}
+        />
+      )}
     </div>
   );
 }

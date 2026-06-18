@@ -82,6 +82,13 @@ export function BoardView({
   const [addDate,      setAddDate]     = useState("");
   const [addPriority,  setAddPriority] = useState<TaskPriority>("normal");
 
+  /* ── Composer de tarea a nivel superior (elige sección) ── */
+  const [topAddOpen,     setTopAddOpen]     = useState(false);
+  const [topAddNode,     setTopAddNode]     = useState<string>("");
+  const [topAddText,     setTopAddText]     = useState("");
+  const [topAddDate,     setTopAddDate]     = useState("");
+  const [topAddPriority, setTopAddPriority] = useState<TaskPriority>("normal");
+
   /* ── Inline name editing ── */
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editText,      setEditText]      = useState("");
@@ -277,6 +284,21 @@ export function BoardView({
     if (!addText.trim()) return;
     onAddTask(nodeId, addText.trim(), addDate || undefined, addPriority);
     clearAdd();
+  };
+
+  /* ── Composer superior: agregar tarea eligiendo la sección ── */
+  const openTopAdd = () => {
+    setTopAddNode((cur) => cur || nodes[0]?.id || "");
+    setTopAddText(""); setTopAddDate(""); setTopAddPriority("normal");
+    setTopAddOpen(true);
+  };
+  const clearTopAdd = () => {
+    setTopAddOpen(false); setTopAddText(""); setTopAddDate(""); setTopAddPriority("normal");
+  };
+  const submitTopAdd = () => {
+    if (!topAddText.trim() || !topAddNode) return;
+    onAddTask(topAddNode, topAddText.trim(), topAddDate || undefined, topAddPriority);
+    setTopAddText("");  // mantiene el composer abierto para agregar varias seguidas
   };
 
   /* ── Inline edit handlers ── */
@@ -688,12 +710,70 @@ export function BoardView({
         </div>
         <div className="al-topbar-right">
           {canEdit && (
-            <button className="board-action-btn primary" onClick={onAddModule}>
-              + Sección
-            </button>
+            <>
+              <button
+                className="board-action-btn"
+                onClick={() => (topAddOpen ? clearTopAdd() : openTopAdd())}
+                disabled={nodes.length === 0}
+                title={nodes.length === 0 ? "Crea una sección primero" : "Agregar tarea"}
+              >
+                + Tarea
+              </button>
+              <button className="board-action-btn primary" onClick={onAddModule}>
+                + Módulo
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {/* ── Composer superior de tarea (elige sección) ── */}
+      {canEdit && topAddOpen && nodes.length > 0 && (
+        <div className="al-topadd-bar">
+          <select
+            className="al-topadd-section"
+            value={topAddNode}
+            onChange={(e) => setTopAddNode(e.target.value)}
+          >
+            {nodes.map((n) => (
+              <option key={n.id} value={n.id}>{n.data.icon} {n.data.title}</option>
+            ))}
+          </select>
+          <input
+            autoFocus
+            type="text"
+            className="al-topadd-input"
+            placeholder="Nombre de la tarea…"
+            value={topAddText}
+            onChange={(e) => setTopAddText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submitTopAdd();
+              if (e.key === "Escape") clearTopAdd();
+            }}
+          />
+          <select
+            className="al-add-priority"
+            value={topAddPriority}
+            style={{ color: PRIORITY_COLORS[topAddPriority].fg }}
+            onChange={(e) => setTopAddPriority(e.target.value as TaskPriority)}
+          >
+            <option value="low">Baja</option>
+            <option value="normal">Normal</option>
+            <option value="high">Alta</option>
+            <option value="urgent">Urgente</option>
+          </select>
+          <input
+            type="date"
+            className="al-add-date"
+            value={topAddDate}
+            onChange={(e) => setTopAddDate(e.target.value)}
+          />
+          <button className="al-add-confirm" onClick={submitTopAdd} disabled={!topAddText.trim()}>
+            Agregar
+          </button>
+          <button className="al-add-cancel" onClick={clearTopAdd} title="Cerrar">✕</button>
+        </div>
+      )}
 
       {/* ── Toolbar ── */}
       <div className="lt-toolbar" ref={toolbarRef}>
