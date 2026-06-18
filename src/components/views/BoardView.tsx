@@ -33,10 +33,7 @@ interface BoardViewProps {
   onRenameSection: (nodeId: string, title: string) => void;
   onSetSectionRole: (nodeId: string, role: string) => void;
   onDeleteModule:  (nodeId: string) => void;
-  /* Switcher de proyecto (sin salir de la vista) */
-  projects:        Project[];
   activeProjectId: string;
-  onSelectProject: (projectId: string) => void;
 }
 
 function fmtDate(d: string) {
@@ -55,7 +52,7 @@ export function BoardView({
   onUpdateTask, onMoveTaskToNode, onSelectView,
   commentsByTask, loadingComments, onLoadComments, onAddComment,
   onRenameSection, onSetSectionRole,
-  onDeleteModule, projects, activeProjectId, onSelectProject,
+  onDeleteModule, activeProjectId,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
 
@@ -708,30 +705,7 @@ export function BoardView({
         <div className="al-topbar-left">
           <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <div>
-            {/* Selector de proyecto estilo Asana — cambia de proyecto sin salir de la vista */}
-            <div className="al-project-switcher">
-              <span className="al-project-square" style={{ background: ROLE_COLORS[nodes[0]?.data.role ?? "ghl"] ?? "#7C3AED" }}>
-                {project.name.charAt(0).toUpperCase()}
-              </span>
-              <select
-                className="al-project-select"
-                value={activeProjectId}
-                onChange={(e) => onSelectProject(e.target.value)}
-                title="Cambiar de proyecto"
-              >
-                {projects.filter((p) => !p.parentProjectId).map((p) => {
-                  const subs = projects.filter((s) => s.parentProjectId === p.id);
-                  return (
-                    <optgroup key={p.id} label={p.name}>
-                      <option value={p.id}>{p.name}</option>
-                      {subs.map((s) => (
-                        <option key={s.id} value={s.id}>↳ {s.name}</option>
-                      ))}
-                    </optgroup>
-                  );
-                })}
-              </select>
-            </div>
+            <div className="al-project-name">{project.name}</div>
             <div className="al-project-sub">
               {nodes.length} secciones · {doneTasks}/{totalTasks} tareas · {pct}% completado
             </div>

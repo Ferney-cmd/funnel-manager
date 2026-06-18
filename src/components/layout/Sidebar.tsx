@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { PROJECT_STATUSES } from "@/lib/constants";
 import { getInitials, type Profile } from "@/lib/profiles";
 import type { Project } from "@/lib/types";
+import { DASHBOARD_GROUP } from "./DashboardTabs";
 
 interface SidebarProps {
   activeProjectId: string;
@@ -24,19 +25,13 @@ interface SidebarProps {
   copilotOpen:     boolean;
 }
 
+// Vistas del sidebar. Las demás (Portafolio, Carga equipo, Kanban, Cronograma,
+// Calendario, Roles, Docs, Permisos) viven como pestañas dentro de "Dashboard".
 const BASE_VIEWS = [
   { id: "mytasks",  icon: "★",  label: "Mis Tareas" },
-  { id: "portfolio",icon: "◫",  label: "Portafolio" },
-  { id: "workload", icon: "⚖",  label: "Carga equipo" },
   { id: "canvas",   icon: "◈",  label: "Embudo"    },
   { id: "board",    icon: "▦",  label: "Dashboard" },
-  { id: "kanban",   icon: "▥",  label: "Kanban"    },
-  { id: "timeline", icon: "▭",  label: "Cronograma" },
-  { id: "calendar", icon: "📅", label: "Calendario" },
-  { id: "roles",    icon: "◎",  label: "Roles"     },
-  { id: "docs",     icon: "⊟",  label: "Docs"      },
   { id: "tablero",  icon: "▤",  label: "Resumen"   },
-  { id: "permisos", icon: "🔐", label: "Permisos"  },
 ];
 
 export function Sidebar({
@@ -156,14 +151,20 @@ export function Sidebar({
       {/* Views */}
       <div className="sidebar-section">
         <div className="sidebar-section-label">Vistas</div>
-        {BASE_VIEWS.map((v) => (
-          <button key={v.id}
-            className={`sidebar-item ${activeView === v.id ? "active" : ""}`}
-            onClick={() => onSelectView(v.id)}>
-            <span className="sidebar-item-icon">{v.icon}</span>
-            {v.label}
-          </button>
-        ))}
+        {BASE_VIEWS.map((v) => {
+          // "Dashboard" queda activo si la vista actual es cualquiera de sus pestañas
+          const isActive = v.id === "board"
+            ? DASHBOARD_GROUP.has(activeView)
+            : activeView === v.id;
+          return (
+            <button key={v.id}
+              className={`sidebar-item ${isActive ? "active" : ""}`}
+              onClick={() => onSelectView(v.id)}>
+              <span className="sidebar-item-icon">{v.icon}</span>
+              {v.label}
+            </button>
+          );
+        })}
         {isAdmin && (
           <button
             className={`sidebar-item ${activeView === "admin" ? "active" : ""}`}

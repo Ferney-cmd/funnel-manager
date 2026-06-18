@@ -26,6 +26,7 @@ import { ProjectWizard }   from "@/components/project/ProjectWizard";
 import { DuplicateModal }  from "@/components/project/DuplicateModal";
 import SearchModal         from "@/components/search/SearchModal";
 import { CopilotPanel }    from "@/components/copilot/CopilotPanel";
+import { DashboardTabs, DASHBOARD_GROUP } from "./DashboardTabs";
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
@@ -1659,67 +1660,100 @@ export function AppShell() {
         visible={activeView === "canvas"}
       />
 
-      {activeView === "board" && (
-        <div className="view-scroll">
-          <BoardView
-            project={activeProject}
-            nodes={currentNodes}
-            members={currentMembers}
-            me={me}
-            myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
-            onAddTask={handleAddTask}
-            onToggleTask={handleTaskToggle}
-            onDeleteTask={handleDeleteTask}
-            onSendMessage={handleSendMessage}
-            onAddModule={handleAddModule}
-            onUpdateTask={handleUpdateTask}
-            onMoveTaskToNode={handleMoveTaskToNode}
+      {/* ── Grupo Dashboard: barra de pestañas + vista activa ── */}
+      {DASHBOARD_GROUP.has(activeView) && (
+        <div className="dash-shell">
+          <DashboardTabs
+            activeView={activeView}
             onSelectView={setActiveView}
-            commentsByTask={commentsByTask}
-            loadingComments={loadingComments}
-            onLoadComments={handleLoadComments}
-            onAddComment={handleAddComment}
-            onRenameSection={(nodeId, title) => handleUpdateNodeData(nodeId, { title })}
-            onSetSectionRole={(nodeId, role) => handleUpdateNodeData(nodeId, { role })}
-            onDeleteModule={handleDeleteModule}
             projects={projects}
             activeProjectId={activeProjectId}
             onSelectProject={setActiveProjectId}
           />
-        </div>
-      )}
+          <div className="dash-shell-body">
+            {activeView === "board" && (
+              <BoardView
+                project={activeProject}
+                nodes={currentNodes}
+                members={currentMembers}
+                me={me}
+                myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
+                onAddTask={handleAddTask}
+                onToggleTask={handleTaskToggle}
+                onDeleteTask={handleDeleteTask}
+                onSendMessage={handleSendMessage}
+                onAddModule={handleAddModule}
+                onUpdateTask={handleUpdateTask}
+                onMoveTaskToNode={handleMoveTaskToNode}
+                onSelectView={setActiveView}
+                commentsByTask={commentsByTask}
+                loadingComments={loadingComments}
+                onLoadComments={handleLoadComments}
+                onAddComment={handleAddComment}
+                onRenameSection={(nodeId, title) => handleUpdateNodeData(nodeId, { title })}
+                onSetSectionRole={(nodeId, role) => handleUpdateNodeData(nodeId, { role })}
+                onDeleteModule={handleDeleteModule}
+                activeProjectId={activeProjectId}
+              />
+            )}
 
-      {activeView === "kanban" && (
-        <div className="view-scroll">
-          <KanbanView
-            project={activeProject}
-            nodes={currentNodes}
-            statuses={currentStatuses}
-            members={currentMembers}
-            canEdit={
-              getMyProjectRole(me?.id, activeProject, currentMembers) === "owner" ||
-              getMyProjectRole(me?.id, activeProject, currentMembers) === "editor"
-            }
-            onMoveTask={handleMoveTask}
-            onSelectView={setActiveView}
-          />
-        </div>
-      )}
+            {activeView === "kanban" && (
+              <KanbanView
+                project={activeProject}
+                nodes={currentNodes}
+                statuses={currentStatuses}
+                members={currentMembers}
+                canEdit={
+                  getMyProjectRole(me?.id, activeProject, currentMembers) === "owner" ||
+                  getMyProjectRole(me?.id, activeProject, currentMembers) === "editor"
+                }
+                onMoveTask={handleMoveTask}
+                onSelectView={setActiveView}
+              />
+            )}
 
-      {activeView === "timeline" && (
-        <div className="view-scroll">
-          <TimelineView
-            project={activeProject}
-            nodes={currentNodes}
-            onSelectView={setActiveView}
-            onUpdateTask={(nodeId, taskId, updates) => handleUpdateTask(nodeId, taskId, updates)}
-          />
-        </div>
-      )}
+            {activeView === "timeline" && (
+              <TimelineView
+                project={activeProject}
+                nodes={currentNodes}
+                onSelectView={setActiveView}
+                onUpdateTask={(nodeId, taskId, updates) => handleUpdateTask(nodeId, taskId, updates)}
+              />
+            )}
 
-      {activeView === "calendar" && (
-        <div className="view-scroll">
-          <CalendarView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
+            {activeView === "calendar" && (
+              <CalendarView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
+            )}
+
+            {activeView === "portfolio" && (
+              <PortfolioView
+                projects={projects}
+                onOpenProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
+                onSelectView={setActiveView}
+              />
+            )}
+
+            {activeView === "workload" && (
+              <WorkloadView onSelectView={setActiveView} projects={projects} />
+            )}
+
+            {activeView === "roles" && (
+              <RolesView project={activeProject} nodes={currentNodes} members={currentMembers} onSelectView={setActiveView} />
+            )}
+
+            {activeView === "docs" && (
+              <DocsView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
+            )}
+
+            {activeView === "permisos" && (
+              <PermissionsView
+                project={activeProject}
+                projectId={activeProjectId}
+                myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
+                onSelectView={setActiveView}
+              />
+            )}
+          </div>
         </div>
       )}
 
@@ -1730,22 +1764,6 @@ export function AppShell() {
             onOpenTaskProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
             onSelectView={setActiveView}
           />
-        </div>
-      )}
-
-      {activeView === "portfolio" && (
-        <div className="view-scroll">
-          <PortfolioView
-            projects={projects}
-            onOpenProject={(pid) => { setActiveProjectId(pid); setActiveView("board"); }}
-            onSelectView={setActiveView}
-          />
-        </div>
-      )}
-
-      {activeView === "workload" && (
-        <div className="view-scroll">
-          <WorkloadView onSelectView={setActiveView} projects={projects} />
         </div>
       )}
 
@@ -1760,32 +1778,9 @@ export function AppShell() {
         </div>
       )}
 
-      {activeView === "roles" && (
-        <div className="view-scroll">
-          <RolesView project={activeProject} nodes={currentNodes} members={currentMembers} onSelectView={setActiveView} />
-        </div>
-      )}
-
-      {activeView === "docs" && (
-        <div className="view-scroll">
-          <DocsView project={activeProject} nodes={currentNodes} onSelectView={setActiveView} />
-        </div>
-      )}
-
       {activeView === "admin" && isPlatformAdmin(me) && (
         <div className="view-scroll">
           <AdminView me={me} onSelectView={setActiveView} />
-        </div>
-      )}
-
-      {activeView === "permisos" && (
-        <div className="view-scroll">
-          <PermissionsView
-            project={activeProject}
-            projectId={activeProjectId}
-            myRole={getMyProjectRole(me?.id, activeProject, currentMembers)}
-            onSelectView={setActiveView}
-          />
         </div>
       )}
 
