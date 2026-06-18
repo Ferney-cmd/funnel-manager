@@ -2635,6 +2635,58 @@ body {
 .al-project-name { font-size: 16px; font-weight: 700; color: var(--text); }
 .al-project-sub  { font-size: 11.5px; color: var(--text3); margin-top: 2px; }
 
+/* ── Switcher de proyecto estilo Asana ── */
+.al-project-switcher {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.al-project-square {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.al-project-select {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 3px 26px 3px 8px;
+  cursor: pointer;
+  max-width: 360px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='3'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  transition: background-color .12s, border-color .12s;
+}
+.al-project-select:hover { background-color: var(--surface2); border-color: var(--border); }
+.al-project-select:focus { outline: none; border-color: var(--brand); }
+
+/* ── Botón eliminar módulo (header de sección) ── */
+.al-delete-section-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  opacity: 0;
+  transition: opacity .12s, background .12s;
+}
+.al-section-header:hover .al-delete-section-btn { opacity: .55; }
+.al-delete-section-btn:hover { opacity: 1; background: #FEE2E2; }
+
 /* ── Column headers ── */
 .al-col-headers {
   display: grid;
@@ -2726,9 +2778,6 @@ body {
   padding: 9px 24px;
   background: var(--surface);
   user-select: none;
-  position: sticky;
-  top: 33px;
-  z-index: 2;
   border-bottom: 1px solid var(--border);
 }
 
@@ -5407,3 +5456,55 @@ body {
   padding: 8px 10px;
 }
 .dup-note-warn { color: #D97706; background: #FEF3C7; }
+
+/* ── TaskDetailPanel: descripciones/notas con fecha ── */
+.tdp-note-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: 1px dashed var(--border2, var(--border));
+  border-radius: 8px;
+  color: var(--text2);
+  font-size: 12.5px;
+  padding: 7px 12px;
+  cursor: pointer;
+  transition: border-color .12s, color .12s;
+}
+.tdp-note-trigger:hover { border-color: var(--brand); color: var(--brand); }
+
+.tdp-note-composer { display: flex; flex-direction: column; gap: 8px; }
+.tdp-note-composer-actions { display: flex; align-items: center; gap: 8px; }
+.tdp-note-add {
+  background: var(--brand); color: #fff; border: none;
+  border-radius: 7px; font-size: 12.5px; font-weight: 600;
+  padding: 6px 14px; cursor: pointer;
+}
+.tdp-note-add:disabled { opacity: .45; cursor: default; }
+.tdp-note-cancel {
+  background: transparent; border: 1px solid var(--border);
+  border-radius: 7px; font-size: 12.5px; color: var(--text2);
+  padding: 6px 12px; cursor: pointer;
+}
+.tdp-note-hint { font-size: 10.5px; color: var(--text3); margin-left: auto; }
+
+.tdp-notes { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.tdp-note-item {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+.tdp-note-meta { display: flex; align-items: center; gap: 7px; margin-bottom: 5px; }
+.tdp-note-author { font-size: 12px; font-weight: 600; color: var(--text); }
+.tdp-note-date { font-size: 10.5px; color: var(--text3); }
+.tdp-note-del {
+  margin-left: auto;
+  background: transparent; border: none; cursor: pointer;
+  font-size: 11px; opacity: .5; padding: 0 2px; border-radius: 4px;
+}
+.tdp-note-del:hover { opacity: 1; }
+.tdp-note-text {
+  font-size: 12.5px; line-height: 1.5; color: var(--text);
+  white-space: pre-wrap; word-break: break-word;
+}

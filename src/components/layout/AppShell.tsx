@@ -860,6 +860,25 @@ export function AppShell() {
     }
   }, [activeProjectId, supabase]);
 
+  /* ── Delete module (node) ───────────────────────────────────── */
+  const handleDeleteModule = useCallback((nodeId: string) => {
+    setNodesMap((prev) => {
+      const snapshot = prev;
+      supabase.from("funnel_nodes").delete().eq("id", nodeId).then(({ error }) => {
+        if (error) { setNodesMap(snapshot); alert("No se pudo eliminar el módulo: " + error.message); }
+      });
+      return {
+        ...prev,
+        [activeProjectId]: (prev[activeProjectId] ?? []).filter((n) => n.id !== nodeId),
+      };
+    });
+    // Limpia edges conectados al nodo eliminado
+    setEdgesMap((prev) => ({
+      ...prev,
+      [activeProjectId]: (prev[activeProjectId] ?? []).filter((e) => e.source !== nodeId && e.target !== nodeId),
+    }));
+  }, [activeProjectId, supabase]);
+
   /* ── Delete task from node ──────────────────────────────────── */
   const handleDeleteTask = useCallback((nodeId: string, taskId: string) => {
     setNodesMap((prev) => {
@@ -1662,6 +1681,10 @@ export function AppShell() {
             onAddComment={handleAddComment}
             onRenameSection={(nodeId, title) => handleUpdateNodeData(nodeId, { title })}
             onSetSectionRole={(nodeId, role) => handleUpdateNodeData(nodeId, { role })}
+            onDeleteModule={handleDeleteModule}
+            projects={projects}
+            activeProjectId={activeProjectId}
+            onSelectProject={setActiveProjectId}
           />
         </div>
       )}

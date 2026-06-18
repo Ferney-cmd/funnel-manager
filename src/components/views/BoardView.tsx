@@ -32,6 +32,11 @@ interface BoardViewProps {
   onAddComment:    (taskId: string, text: string) => void;
   onRenameSection: (nodeId: string, title: string) => void;
   onSetSectionRole: (nodeId: string, role: string) => void;
+  onDeleteModule:  (nodeId: string) => void;
+  /* Switcher de proyecto (sin salir de la vista) */
+  projects:        Project[];
+  activeProjectId: string;
+  onSelectProject: (projectId: string) => void;
 }
 
 function fmtDate(d: string) {
@@ -50,6 +55,7 @@ export function BoardView({
   onUpdateTask, onMoveTaskToNode, onSelectView,
   commentsByTask, loadingComments, onLoadComments, onAddComment,
   onRenameSection, onSetSectionRole,
+  onDeleteModule, projects, activeProjectId, onSelectProject,
 }: BoardViewProps) {
   const canEdit   = myRole === "owner" || myRole === "editor";
 
@@ -702,7 +708,30 @@ export function BoardView({
         <div className="al-topbar-left">
           <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
           <div>
-            <div className="al-project-name">{project.name}</div>
+            {/* Selector de proyecto estilo Asana — cambia de proyecto sin salir de la vista */}
+            <div className="al-project-switcher">
+              <span className="al-project-square" style={{ background: ROLE_COLORS[nodes[0]?.data.role ?? "ghl"] ?? "#7C3AED" }}>
+                {project.name.charAt(0).toUpperCase()}
+              </span>
+              <select
+                className="al-project-select"
+                value={activeProjectId}
+                onChange={(e) => onSelectProject(e.target.value)}
+                title="Cambiar de proyecto"
+              >
+                {projects.filter((p) => !p.parentProjectId).map((p) => {
+                  const subs = projects.filter((s) => s.parentProjectId === p.id);
+                  return (
+                    <optgroup key={p.id} label={p.name}>
+                      <option value={p.id}>{p.name}</option>
+                      {subs.map((s) => (
+                        <option key={s.id} value={s.id}>↳ {s.name}</option>
+                      ))}
+                    </optgroup>
+                  );
+                })}
+              </select>
+            </div>
             <div className="al-project-sub">
               {nodes.length} secciones · {doneTasks}/{totalTasks} tareas · {pct}% completado
             </div>
@@ -1167,6 +1196,22 @@ export function BoardView({
                         ✨ IA
                       </button>
                     )}
+                    {canDelete && (
+                      <button
+                        className="al-delete-section-btn"
+                        title="Eliminar módulo"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const count = n.data.tasks.length;
+                          const msg = count > 0
+                            ? `¿Eliminar el módulo "${n.data.title}" y sus ${count} tarea${count !== 1 ? "s" : ""}? Esta acción no se puede deshacer.`
+                            : `¿Eliminar el módulo "${n.data.title}"?`;
+                          if (confirm(msg)) onDeleteModule(n.id);
+                        }}
+                      >
+                        🗑
+                      </button>
+                    )}
                   </div>
 
                   {!isCol && (
@@ -1354,6 +1399,7 @@ export function BoardView({
         {panelOpen && selTask && selNode && (
           <TaskDetailPanel
             task={selTask}
+            projectId={activeProjectId}
             nodeTitle={selNode.data.title}
             nodeIcon={selNode.data.icon}
             members={members}
