@@ -27,6 +27,9 @@ import { DuplicateModal }  from "@/components/project/DuplicateModal";
 import SearchModal         from "@/components/search/SearchModal";
 import { CopilotPanel }    from "@/components/copilot/CopilotPanel";
 import { DashboardTabs, DASHBOARD_GROUP } from "./DashboardTabs";
+import { playChime, ensureNotificationPermission, showBrowserNotification } from "@/lib/notify";
+
+interface Toast { id: string; title: string; body: string; }
 import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
@@ -83,12 +86,24 @@ export function AppShell() {
   const [searchOpen,       setSearchOpen]        = useState(false);
   const [copilotOpen,      setCopilotOpen]       = useState(false);
   const [duplicateOpen,    setDuplicateOpen]     = useState(false);
+  const [toasts,           setToasts]            = useState<Toast[]>([]);
+
+  const pushToast = useCallback((title: string, body: string) => {
+    const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    setToasts((prev) => [...prev, { id, title, body }].slice(-4));
+    setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 7000);
+  }, []);
 
   // Ref to avoid stale closure in realtime handlers
   const activeProjectIdRef = useRef(activeProjectId);
   const meRef              = useRef(me);
+  const seenNotifIds       = useRef<Set<string>>(new Set());
+  const notifBaseline      = useRef<string>("");
   useEffect(() => { activeProjectIdRef.current = activeProjectId; }, [activeProjectId]);
   useEffect(() => { meRef.current = me; }, [me]);
+
+  /* Pide permiso de notificaciones del navegador una vez que hay sesión */
+  useEffect(() => { if (me) ensureNotificationPermission(); }, [me?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Persistencia de UI efímera (último proyecto + pestaña) ──── */
   // Restaura la última pestaña usada al montar (solo vistas conocidas)
@@ -645,52 +660,94 @@ export function AppShell() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProjectId, me?.id]);
 
-  /* ── Unread notifications count ─────────────────────────────── */
+  /* ── Notificaciones: conteo + avisos (realtime + polling de respaldo) ─
+     El realtime de Supabase no siempre entrega los INSERT a tiempo, así que
+     un poll cada 25s garantiza que los avisos (sonido + toast + navegador)
+     y el contador funcionen de forma confiable. Se deduplica por id. */
   useEffect(() => {
     if (!me) return;
+    const myId = me.id;
     let cancelled = false;
-
-    // Initial count
+    const seen = seenNotifIds.current;
+    // Base de corte tomada del SERVIDOR (evita desfase de reloj cliente/servidor).
+    // Hasta que se resuelva, "" hace que el poll espere (no dispara avisos viejos).
+    notifBaseline.current = "";
     supabase
       .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", me.id)
-      .eq("read", false)
-      .then(({ count }) => {
-        if (!cancelled) setUnreadCount(count ?? 0);
+      .select("created_at")
+      .eq("user_id", myId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .then(({ data }) => {
+        if (!cancelled) notifBaseline.current = data?.[0]?.created_at ?? new Date(0).toISOString();
       });
 
-    // Realtime: increment on new unread notification
+    const fireFx = (n: { id: string; read?: boolean; title?: string; body?: string }) => {
+      if (seen.has(n.id)) return;
+      seen.add(n.id);
+      const title = n.title || "Nueva notificación";
+      const body  = n.body  || "";
+      playChime();
+      pushToast(title, body);
+      if (typeof document !== "undefined" && document.hidden) {
+        showBrowserNotification(title, body);
+      }
+    };
+
+    const refreshCount = () => {
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", myId)
+        .eq("read", false)
+        .then(({ count }) => { if (!cancelled) setUnreadCount(count ?? 0); });
+    };
+
+    refreshCount();
+
+    // Realtime (instantáneo cuando funciona)
     const ch = supabase
-      .channel(`notif-count:${me.id}`)
+      .channel(`notif-rt:${myId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${me.id}` },
+        { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${myId}` },
         (payload) => {
           if (cancelled) return;
-          const n = payload.new as { read: boolean };
+          const n = payload.new as { id: string; read?: boolean; title?: string; body?: string; created_at?: string };
           if (!n.read) setUnreadCount((c) => c + 1);
+          if (n.created_at && n.created_at > notifBaseline.current) notifBaseline.current = n.created_at;
+          if (!n.read) fireFx(n);
         }
       )
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${me.id}` },
-        () => {
-          if (cancelled) return;
-          // Re-fetch count on any update (mark-read)
-          supabase
-            .from("notifications")
-            .select("id", { count: "exact", head: true })
-            .eq("user_id", me.id)
-            .eq("read", false)
-            .then(({ count }) => { if (!cancelled) setUnreadCount(count ?? 0); });
-        }
+        { event: "UPDATE", schema: "public", table: "notifications", filter: `user_id=eq.${myId}` },
+        () => { if (!cancelled) refreshCount(); }
       )
       .subscribe();
+
+    // Polling de respaldo: trae las nuevas desde el último corte y dispara fx
+    const poll = setInterval(async () => {
+      if (cancelled || !notifBaseline.current) return;  // espera a tener base del servidor
+      const { data } = await supabase
+        .from("notifications")
+        .select("id, title, body, read, created_at")
+        .eq("user_id", myId)
+        .gt("created_at", notifBaseline.current)
+        .order("created_at", { ascending: true })
+        .limit(20);
+      if (cancelled || !data) return;
+      for (const n of data as { id: string; title?: string; body?: string; read?: boolean; created_at: string }[]) {
+        if (n.created_at > notifBaseline.current) notifBaseline.current = n.created_at;
+        if (!n.read) fireFx(n);
+      }
+      refreshCount();
+    }, 15000);
 
     return () => {
       cancelled = true;
       supabase.removeChannel(ch);
+      clearInterval(poll);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [me?.id]);
@@ -1854,6 +1911,29 @@ export function AppShell() {
           onClose={() => setDuplicateOpen(false)}
           onConfirm={handleDuplicate}
         />
+      )}
+
+      {/* Toasts de notificación (sonido + visual) */}
+      {toasts.length > 0 && (
+        <div className="toast-stack">
+          {toasts.map((t) => (
+            <div
+              key={t.id}
+              className="toast"
+              onClick={() => { setNotifOpen(true); setToasts((prev) => prev.filter((x) => x.id !== t.id)); }}
+            >
+              <span className="toast-icon">🔔</span>
+              <div className="toast-body">
+                <div className="toast-title">{t.title}</div>
+                {t.body && <div className="toast-text">{t.body}</div>}
+              </div>
+              <button
+                className="toast-close"
+                onClick={(e) => { e.stopPropagation(); setToasts((prev) => prev.filter((x) => x.id !== t.id)); }}
+              >✕</button>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
