@@ -94,7 +94,7 @@ export function parseCommand(textRaw: string): Command {
   }
 
   // Crear (verbo de creación al inicio o claro)
-  m = t.match(/\b(agrega(?:r|me)?|a[ñn]ade|a[ñn]adir|crea(?:r)?|nueva tarea|recuerdame|recuerda|recordar|apunta|anota|pon(?:er|)|nueva|necesito)\b\s*(.*)$/);
+  m = t.match(/^\s*(?:por favor\s+|porfa\s+|oye\s+|hey\s+)?(agregame|agregar|agrega|a[ñn]ade|a[ñn]adir|crear una tarea|crear tarea|crear|crea|nueva tarea|recuerdame|recordar|apunta|anota)\b\s*(.*)$/);
   if (m && m[2]?.trim()) {
     // usar el TEXTO ORIGINAL (con tildes/mayúsculas) para el título
     const startIdx = textRaw.toLowerCase().indexOf(m[2].slice(0, 8).toLowerCase());
