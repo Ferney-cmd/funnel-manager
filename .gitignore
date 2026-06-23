@@ -43,3 +43,6 @@ secrets.json
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.wa_secret
+.tg_secret
+.tg_token
