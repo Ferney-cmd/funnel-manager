@@ -171,6 +171,32 @@ async function execTool(ctx: Ctx, name: string, args: any) {
   }
 }
 
+/* Texto del resumen diario personal de un usuario (o null si no hay nada relevante).
+   Reutilizable por cualquier canal (WhatsApp, Telegram). */
+export async function buildDailyText(sb: SupabaseClient, userId: string): Promise<string | null> {
+  const today = todayStr();
+  const week = new Date(); week.setDate(week.getDate() + 7);
+  const weekStr = week.toISOString().slice(0, 10);
+
+  const { data } = await sb.from("node_tasks")
+    .select("text, due_date, done").eq("assigned_to", userId).eq("done", false).limit(200);
+  const rows = (data ?? []) as { text: string; due_date: string | null }[];
+  const vencidas = rows.filter((t) => t.due_date && t.due_date < today);
+  const hoy      = rows.filter((t) => t.due_date === today);
+  const semana   = rows.filter((t) => t.due_date && t.due_date > today && t.due_date <= weekStr);
+  if (!vencidas.length && !hoy.length && !semana.length) return null;
+
+  const { data: prof } = await sb.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+  const name = (prof?.full_name || "").split(" ")[0];
+
+  let text = `☀️ Buenos días${name ? `, ${name}` : ""}. Tu resumen de hoy:`;
+  if (vencidas.length) text += `\n\n⚠️ Vencidas (${vencidas.length})\n` + vencidas.slice(0, 8).map((t) => `• ${t.text}`).join("\n") + (vencidas.length > 8 ? `\n… y ${vencidas.length - 8} más` : "");
+  if (hoy.length)      text += `\n\n📅 Para hoy (${hoy.length})\n` + hoy.slice(0, 8).map((t) => `• ${t.text}`).join("\n");
+  if (semana.length)   text += `\n\n🗓️ Esta semana (${semana.length})\n` + semana.slice(0, 6).map((t) => `• ${t.text} (${t.due_date})`).join("\n");
+  text += `\n\nEscríbeme si quieres marcar algo como hecho o agregar una tarea.`;
+  return text;
+}
+
 export interface AgentResult { reply: string; actions: string[]; }
 
 export async function runUserAgent(opts: {

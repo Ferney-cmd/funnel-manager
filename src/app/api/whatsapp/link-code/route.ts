@@ -11,13 +11,19 @@ function genCode(len = 6) {
   return s;
 }
 
-/* GET → estado del vínculo del usuario actual */
+/* GET → estado del vínculo del usuario actual (WhatsApp y Telegram) */
 export async function GET() {
   const sb = createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  const { data: link } = await sb.from("whatsapp_links").select("phone, linked_at").eq("user_id", user.id).maybeSingle();
-  return NextResponse.json({ linked: !!link, phone: link?.phone ?? null, linkedAt: link?.linked_at ?? null });
+  const [{ data: wa }, { data: tg }] = await Promise.all([
+    sb.from("whatsapp_links").select("phone").eq("user_id", user.id).maybeSingle(),
+    sb.from("telegram_links").select("username").eq("user_id", user.id).maybeSingle(),
+  ]);
+  return NextResponse.json({
+    whatsapp: { linked: !!wa, phone: wa?.phone ?? null },
+    telegram: { linked: !!tg, username: tg?.username ?? null },
+  });
 }
 
 /* POST → genera un código de vínculo de 6 caracteres (válido 15 min) */
@@ -41,11 +47,14 @@ export async function POST() {
   return NextResponse.json({ code, expiresInMin: 15 });
 }
 
-/* DELETE → desvincula el WhatsApp del usuario */
+/* DELETE → desvincula los chats (WhatsApp y Telegram) del usuario */
 export async function DELETE() {
   const sb = createClient();
   const { data: { user } } = await sb.auth.getUser();
   if (!user) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
-  await sb.from("whatsapp_links").delete().eq("user_id", user.id);
+  await Promise.all([
+    sb.from("whatsapp_links").delete().eq("user_id", user.id),
+    sb.from("telegram_links").delete().eq("user_id", user.id),
+  ]);
   return NextResponse.json({ ok: true });
 }
