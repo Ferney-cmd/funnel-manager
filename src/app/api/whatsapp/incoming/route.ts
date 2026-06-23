@@ -30,22 +30,25 @@ export async function POST(req: Request) {
   const { data: link } = await sb.from("whatsapp_links").select("user_id").eq("phone", phone).maybeSingle();
 
   if (!link) {
-    // ¿El texto es un código de vínculo? (6 dígitos / alfanumérico corto)
+    // ¿El texto es un código de vínculo? (exactamente 6 caracteres del alfabeto)
     const code = text.toUpperCase().replace(/[^A-Z0-9]/g, "");
-    if (code.length >= 4 && code.length <= 10) {
+    if (/^[A-Z0-9]{6}$/.test(code)) {
       const { data: codeRow } = await sb.from("whatsapp_link_codes")
         .select("code, user_id, expires_at, used").eq("code", code).maybeSingle();
-      if (codeRow && !codeRow.used && new Date(codeRow.expires_at) > new Date()) {
-        // Vincular
-        await sb.from("whatsapp_links").upsert({ user_id: codeRow.user_id, phone }, { onConflict: "user_id" });
-        await sb.from("whatsapp_link_codes").update({ used: true }).eq("code", code);
-        const { data: prof } = await sb.from("profiles").select("full_name, email").eq("id", codeRow.user_id).maybeSingle();
-        const name = prof?.full_name || prof?.email || "";
-        return NextResponse.json({
-          reply: `✅ ¡Listo${name ? `, ${name}` : ""}! Tu WhatsApp quedó vinculado a FunnelManager.\n\nYa puedes pedirme cosas como:\n• "¿qué tengo para hoy?"\n• "agrega revisar propuesta para mañana"\n• "ya terminé la llamada con el cliente"`,
-        });
+      if (codeRow) {
+        if (!codeRow.used && new Date(codeRow.expires_at) > new Date()) {
+          await sb.from("whatsapp_links").upsert({ user_id: codeRow.user_id, phone }, { onConflict: "user_id" });
+          await sb.from("whatsapp_link_codes").update({ used: true }).eq("code", code);
+          const { data: prof } = await sb.from("profiles").select("full_name, email").eq("id", codeRow.user_id).maybeSingle();
+          const name = prof?.full_name || prof?.email || "";
+          return NextResponse.json({
+            reply: `✅ ¡Listo${name ? `, ${name}` : ""}! Tu WhatsApp quedó vinculado a FunnelManager.\n\nYa puedes pedirme cosas como:\n• "¿qué tengo para hoy?"\n• "agrega revisar propuesta para mañana"\n• "ya terminé la llamada con el cliente"`,
+          });
+        }
+        // El código existe pero está usado o expirado → avisar
+        return NextResponse.json({ reply: "Ese código ya se usó o expiró. Genera uno nuevo en FunnelManager → Perfil → WhatsApp." });
       }
-      return NextResponse.json({ reply: "Ese código no es válido o ya expiró. Genera uno nuevo en FunnelManager → Perfil → WhatsApp." });
+      // No existe ese código → tratar como mensaje normal (cae al saludo)
     }
     return NextResponse.json({
       reply: "Hola 👋 Soy el asistente de FunnelManager. Para activarme, entra a la app → Perfil → WhatsApp, genera tu código y envíamelo aquí.",
