@@ -5,6 +5,8 @@ export const maxDuration = 60;
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { runUserAgent } from "@/lib/agent/waAgent";
+import { parseCommand } from "@/lib/agent/router";
+import { executeCommand } from "@/lib/agent/engine";
 
 /* Solo dígitos del número (Baileys envía 573208839619@s.whatsapp.net) */
 function normalizePhone(p: string) {
@@ -55,11 +57,16 @@ export async function POST(req: Request) {
     });
   }
 
-  // Usuario vinculado → ejecutar agente
+  // Usuario vinculado → router determinista primero (0 tokens); IA solo si no entiende
+  const cmd = parseCommand(text);
+  if (cmd.tipo !== "desconocido") {
+    const res = await executeCommand(sb, link.user_id, cmd);
+    return NextResponse.json({ reply: res.reply });
+  }
+
   const { data: prof } = await sb.from("profiles").select("full_name, email").eq("id", link.user_id).maybeSingle();
   const userName = prof?.full_name || prof?.email || "";
-
   const history = Array.isArray(body?.history) ? body.history : [];
   const result = await runUserAgent({ sb, userId: link.user_id, userName, message: text, history });
-  return NextResponse.json({ reply: result.reply, actions: result.actions });
+  return NextResponse.json({ reply: result.reply });
 }
