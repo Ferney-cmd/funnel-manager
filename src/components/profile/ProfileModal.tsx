@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { getInitials, clearProfileCache, type Profile } from "@/lib/profiles";
+import { WhatsAppLink } from "./WhatsAppLink";
 
 const COLORS = [
   "#7C3AED", "#10B981", "#3B82F6", "#F59E0B",
@@ -110,6 +111,9 @@ export function ProfileModal({ me, onClose, onUpdate }: ProfileModalProps) {
             ))}
           </div>
         </div>
+
+        {/* WhatsApp link */}
+        <WhatsAppLink />
 
         {error && <p className="profile-error">{error}</p>}
 

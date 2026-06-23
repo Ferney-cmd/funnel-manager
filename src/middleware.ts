@@ -35,8 +35,11 @@ export async function middleware(request: NextRequest) {
   }
 
   const isAuthRoute = request.nextUrl.pathname.startsWith("/auth");
+  // Las rutas /api validan su propia autenticación (sesión o secreto) y deben
+  // responder JSON/401, no ser redirigidas al login (el webhook de WhatsApp no tiene cookie).
+  const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-  if (!user && !isAuthRoute) {
+  if (!user && !isAuthRoute && !isApiRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/auth/login";
     return NextResponse.redirect(url);
