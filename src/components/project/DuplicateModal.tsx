@@ -13,10 +13,11 @@ interface DuplicateModalProps {
 
 type Dest = "root" | "sub";
 
-export function DuplicateModal({ source, projects, isAdmin, onClose, onConfirm }: DuplicateModalProps) {
+export function DuplicateModal({ source, projects, isAdmin: _isAdmin, onClose, onConfirm }: DuplicateModalProps) {
+  // Permisivo: cualquier usuario puede crear nivel raíz (Cliente). Ignoramos isAdmin.
+  void _isAdmin;
   const [name, setName]       = useState(`${source.name} (copia)`);
-  // Los no-admin solo pueden crear subproyectos
-  const [dest, setDest]       = useState<Dest>(isAdmin && !source.parentProjectId ? "root" : "sub");
+  const [dest, setDest]       = useState<Dest>(!source.parentProjectId ? "root" : "sub");
   const [parentId, setParentId] = useState<string>(source.parentProjectId ?? "");
   const [saving, setSaving]   = useState(false);
 
@@ -45,8 +46,8 @@ export function DuplicateModal({ source, projects, isAdmin, onClose, onConfirm }
     }
   }
 
-  // Un no-admin sin proyectos donde anidar no puede duplicar
-  const blockedNoParent = !isAdmin && !canSubproject;
+  // Cualquiera puede crear nivel raíz, así que duplicar nunca queda bloqueado.
+  const blockedNoParent = false;
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
@@ -76,20 +77,18 @@ export function DuplicateModal({ source, projects, isAdmin, onClose, onConfirm }
         <div className="dup-field">
           <span className="dup-label">¿Dónde lo creo?</span>
           <div className="dup-options">
-            {isAdmin && (
-              <label className={`dup-option${dest === "root" ? " active" : ""}`}>
-                <input
-                  type="radio"
-                  name="dup-dest"
-                  checked={dest === "root"}
-                  onChange={() => setDest("root")}
-                />
-                <div>
-                  <div className="dup-option-title">Proyecto independiente</div>
-                  <div className="dup-option-desc">Aparece como proyecto principal</div>
-                </div>
-              </label>
-            )}
+            <label className={`dup-option${dest === "root" ? " active" : ""}`}>
+              <input
+                type="radio"
+                name="dup-dest"
+                checked={dest === "root"}
+                onChange={() => setDest("root")}
+              />
+              <div>
+                <div className="dup-option-title">Cliente (independiente)</div>
+                <div className="dup-option-desc">Aparece como cliente principal</div>
+              </div>
+            </label>
 
             <label className={`dup-option${dest === "sub" ? " active" : ""}${!canSubproject ? " disabled" : ""}`}>
               <input
@@ -100,9 +99,9 @@ export function DuplicateModal({ source, projects, isAdmin, onClose, onConfirm }
                 onChange={() => setDest("sub")}
               />
               <div>
-                <div className="dup-option-title">Subproyecto de…</div>
+                <div className="dup-option-title">Proyecto de…</div>
                 <div className="dup-option-desc">
-                  {canSubproject ? "Anidado dentro de otro proyecto" : "No hay proyectos principales disponibles"}
+                  {canSubproject ? "Anidado dentro de un cliente" : "No hay clientes disponibles"}
                 </div>
               </div>
             </label>
@@ -120,16 +119,6 @@ export function DuplicateModal({ source, projects, isAdmin, onClose, onConfirm }
             </select>
           )}
 
-          {!isAdmin && (
-            <div className="dup-note">
-              Solo los administradores pueden crear proyectos principales. Tu copia se creará como subproyecto.
-            </div>
-          )}
-          {blockedNoParent && (
-            <div className="dup-note dup-note-warn">
-              No tienes un proyecto principal donde anidar la copia. Pídele a un administrador que la duplique.
-            </div>
-          )}
         </div>
 
         <div className="dup-actions">

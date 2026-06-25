@@ -47,7 +47,7 @@ export default function LoginPage() {
       if (error) {
         setError(error.message);
       } else {
-        setSuccess("Revisa tu email para confirmar la cuenta.");
+        window.location.href = "/";
       }
     }
 

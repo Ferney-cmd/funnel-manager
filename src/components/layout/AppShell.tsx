@@ -30,10 +30,10 @@ import { DashboardTabs, DASHBOARD_GROUP } from "./DashboardTabs";
 import { playChime, ensureNotificationPermission, showBrowserNotification } from "@/lib/notify";
 
 interface Toast { id: string; title: string; body: string; }
-import { getCurrentProfile, getInitials, isPlatformAdmin, type Profile } from "@/lib/profiles";
+import { getCurrentProfile, getInitials, isSuperAdmin, type Profile } from "@/lib/profiles";
 import { ProfileModal } from "@/components/profile/ProfileModal";
 import type { FunnelNodeData, Project, ChatMessage, ProjectMember, ZoneNodeData, TaskPriority, ProjectRole, TaskStatus } from "@/lib/types";
-import { ROLE_LABELS } from "@/lib/constants";
+import { ROLE_LABELS, type ProjectStatus } from "@/lib/constants";
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
@@ -1368,6 +1368,13 @@ export function AppShell() {
     setWizardOpen(true);
   }, [activeProjectId]);
 
+  const handleChangeProjectStatus = useCallback(async (status: ProjectStatus) => {
+    if (!activeProjectId) return;
+    setProjects(prev => prev.map(p => p.id === activeProjectId ? { ...p, status } : p));
+    const { error } = await supabase.from("projects").update({ status }).eq("id", activeProjectId);
+    if (error) alert("No se pudo cambiar el estado: " + error.message);
+  }, [activeProjectId, supabase]);
+
   /* ── Wizard finished — recarga el proyecto recién creado ────── */
   const handleWizardCreated = useCallback(async (projectId: string) => {
     const { data, error } = await supabase
@@ -1606,66 +1613,29 @@ export function AppShell() {
 
   /* ── Empty state ────────────────────────────────────────────── */
   if (projects.length === 0) {
-    const isAdmin = isPlatformAdmin(me);
     return (
       <>
         <div className="app-loading">
-          <div className="app-loading-icon">{isAdmin ? "⚡" : "🔒"}</div>
-          {isAdmin ? (
-            <>
-              <p style={{ color: "var(--text2)", marginBottom: 16 }}>
-                No tienes proyectos aún. Crea el primero.
-              </p>
-              <button
-                onClick={handleNewProject}
-                style={{
-                  background: "var(--brand)", color: "#fff", border: "none",
-                  padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
-                }}
-              >
-                + Crear primer proyecto
-              </button>
-            </>
-          ) : (
-            <>
-              <p style={{ color: "var(--text)", fontWeight: 600, marginBottom: 8, fontSize: 15 }}>
-                Esperando acceso
-              </p>
-              <p style={{ color: "var(--text2)", marginBottom: 20, fontSize: 13, maxWidth: 320, textAlign: "center" }}>
-                Tu cuenta está activa pero aún no tienes proyectos asignados.
-                Un administrador debe invitarte a un proyecto para que puedas trabajar.
-              </p>
-              <div style={{
-                background: "var(--surface2)", border: "1px solid var(--border)",
-                borderRadius: 10, padding: "12px 20px", fontSize: 12, color: "var(--text3)",
-                maxWidth: 320, textAlign: "center",
-              }}>
-                📧 Comparte tu email con el admin:<br />
-                <strong style={{ color: "var(--text2)", marginTop: 4, display: "block" }}>
-                  {me?.email}
-                </strong>
-              </div>
-              <button
-                onClick={handleLogout}
-                style={{
-                  marginTop: 24, background: "transparent", border: "1px solid var(--border)",
-                  color: "var(--text3)", padding: "6px 16px", borderRadius: 8,
-                  cursor: "pointer", fontSize: 12,
-                }}
-              >
-                ↩ Cerrar sesión
-              </button>
-            </>
-          )}
+          <div className="app-loading-icon">⚡</div>
+          <p style={{ color: "var(--text2)", marginBottom: 16 }}>
+            No tienes clientes aún. Crea el primero.
+          </p>
+          <button
+            onClick={handleNewProject}
+            style={{
+              background: "var(--brand)", color: "#fff", border: "none",
+              padding: "8px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13,
+            }}
+          >
+            + Crear tu primer cliente
+          </button>
         </div>
-        {isAdmin && (
-          <ProjectWizard
-            open={wizardOpen}
-            parentProjectId={wizardParentId}
-            onClose={() => setWizardOpen(false)}
-            onCreated={handleWizardCreated}
-          />
-        )}
+        <ProjectWizard
+          open={wizardOpen}
+          parentProjectId={wizardParentId}
+          onClose={() => setWizardOpen(false)}
+          onCreated={handleWizardCreated}
+        />
       </>
     );
   }
@@ -1688,7 +1658,7 @@ export function AppShell() {
         onLogout={handleLogout}
         me={me}
         onOpenProfile={() => setProfileOpen(true)}
-        isAdmin={isPlatformAdmin(me)}
+        isSuperAdmin={isSuperAdmin(me)}
         onOpenCopilot={() => setCopilotOpen((v) => !v)}
         copilotOpen={copilotOpen}
       />
@@ -1704,6 +1674,7 @@ export function AppShell() {
         onOpenTeam={() => setTeamOpen(true)}
         unreadCount={unreadCount}
         onOpenNotifications={() => setNotifOpen(true)}
+        onChangeStatus={handleChangeProjectStatus}
       />
 
       {/* Always rendered to preserve layout */}
@@ -1835,7 +1806,7 @@ export function AppShell() {
         </div>
       )}
 
-      {activeView === "admin" && isPlatformAdmin(me) && (
+      {activeView === "admin" && isSuperAdmin(me) && (
         <div className="view-scroll">
           <AdminView me={me} onSelectView={setActiveView} />
         </div>
@@ -1907,7 +1878,7 @@ export function AppShell() {
         <DuplicateModal
           source={activeProject}
           projects={projects}
-          isAdmin={isPlatformAdmin(me)}
+          isAdmin={isSuperAdmin(me)}
           onClose={() => setDuplicateOpen(false)}
           onConfirm={handleDuplicate}
         />

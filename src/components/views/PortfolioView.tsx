@@ -159,7 +159,7 @@ export function PortfolioView({ projects, onOpenProject, onSelectView }: Portfol
       <table className="pf-table">
         <thead>
           <tr>
-            <th className="pf-th">Proyecto</th>
+            <th className="pf-th">Cliente / Proyecto</th>
             <th className="pf-th">Estado</th>
             <th className="pf-th">Avance</th>
             <th className="pf-th">Tareas</th>

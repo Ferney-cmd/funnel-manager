@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import type { Project, ProjectMember } from "@/lib/types";
-import { PROJECT_STATUSES } from "@/lib/constants";
+import { PROJECT_STATUSES, type ProjectStatus } from "@/lib/constants";
 import { getInitials } from "@/lib/profiles";
 import { ThemeToggle } from "./ThemeToggle";
 
@@ -18,6 +18,7 @@ interface TopbarProps {
   onOpenTeam:  () => void;
   unreadCount?:          number;
   onOpenNotifications?:  () => void;
+  onChangeStatus?:       (status: ProjectStatus) => void;
 }
 
 export function Topbar({
@@ -25,6 +26,7 @@ export function Topbar({
   members, onlineUsers,
   onRename, onDuplicate, onAddModule, onOpenTeam,
   unreadCount = 0, onOpenNotifications,
+  onChangeStatus,
 }: TopbarProps) {
   const project    = projects.find((p) => p.id === projectId);
   const statusLabel = project ? PROJECT_STATUSES[project.status].label : "—";
@@ -32,6 +34,7 @@ export function Topbar({
   const blocked     = project?.blockedCount ?? 0;
 
   const [editing, setEditing] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const [name, setName] = useState(project?.name ?? "");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -78,10 +81,39 @@ export function Topbar({
         </span>
       )}
 
-      <span className={`topbar-badge ${isActive ? "topbar-badge-active" : ""}`}
-        style={!isActive ? { background: "#FEF3C7", color: "#92400E" } : undefined}>
-        {statusLabel}
-      </span>
+      {onChangeStatus && project ? (
+        <div className="tb-status-menu">
+          <button
+            type="button"
+            className={`tb-status-trigger topbar-badge ${isActive ? "topbar-badge-active" : ""}`}
+            style={!isActive ? { background: "#FEF3C7", color: "#92400E" } : undefined}
+            onClick={() => setStatusOpen((o) => !o)}
+            onBlur={() => setTimeout(() => setStatusOpen(false), 120)}
+          >
+            {statusLabel}
+          </button>
+          {statusOpen && (
+            <div className="tb-status-dropdown">
+              {(Object.keys(PROJECT_STATUSES) as ProjectStatus[]).map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`tb-status-option${project.status === key ? " active" : ""}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => { onChangeStatus(key); setStatusOpen(false); }}
+                >
+                  {PROJECT_STATUSES[key].label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <span className={`topbar-badge ${isActive ? "topbar-badge-active" : ""}`}
+          style={!isActive ? { background: "#FEF3C7", color: "#92400E" } : undefined}>
+          {statusLabel}
+        </span>
+      )}
 
       {blocked > 0 && (
         <span className="topbar-badge topbar-badge-blocked">

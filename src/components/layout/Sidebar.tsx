@@ -20,7 +20,7 @@ interface SidebarProps {
   onLogout:        () => void;
   me:              Profile | null;
   onOpenProfile:   () => void;
-  isAdmin:         boolean;
+  isSuperAdmin:    boolean;
   onOpenCopilot:   () => void;
   copilotOpen:     boolean;
 }
@@ -39,7 +39,7 @@ export function Sidebar({
   onSelectProject, activeView, onSelectView,
   onNewProject, onNewSubproject, onDeleteProject,
   onAddModule, onAddZone, onLogout,
-  me, onOpenProfile, isAdmin,
+  me, onOpenProfile, isSuperAdmin,
   onOpenCopilot, copilotOpen,
 }: SidebarProps) {
 
@@ -119,7 +119,7 @@ export function Sidebar({
 
       {/* Projects */}
       <div className="sidebar-section">
-        <div className="sidebar-section-label">Proyectos</div>
+        <div className="sidebar-section-label">Clientes</div>
         {rootProjects.map((p) => {
           const children = subprojectsByParent[p.id] || [];
           const hasChildren = children.length > 0;
@@ -132,16 +132,14 @@ export function Sidebar({
             </div>
           );
         })}
-        {isAdmin && (
-          <button className="sidebar-add-btn" onClick={onNewProject}>
-            <span style={{ fontSize: 14 }}>+</span>
-            Nuevo proyecto
-          </button>
-        )}
-        {isAdmin && activeProjectId && (
+        <button className="sidebar-add-btn" onClick={onNewProject}>
+          <span style={{ fontSize: 14 }}>+</span>
+          Nuevo cliente
+        </button>
+        {activeProjectId && (
           <button className="sidebar-add-btn" onClick={onNewSubproject} style={{ marginTop: 2 }}>
             <span style={{ fontSize: 14 }}>↳</span>
-            Subproyecto
+            Nuevo proyecto
           </button>
         )}
       </div>
@@ -165,7 +163,7 @@ export function Sidebar({
             </button>
           );
         })}
-        {isAdmin && (
+        {isSuperAdmin && (
           <button
             className={`sidebar-item ${activeView === "admin" ? "active" : ""}`}
             onClick={() => onSelectView("admin")}

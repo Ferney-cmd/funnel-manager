@@ -170,7 +170,7 @@ export function ProjectWizard({ open, parentProjectId, parentProjectName, onClos
         <div className="wizard-header">
           <div>
             <div className="wizard-title">
-              {parentProjectId ? "Nuevo subproyecto" : "Nuevo proyecto"}
+              {parentProjectId ? "Nuevo proyecto" : "Nuevo cliente"}
             </div>
             {parentProjectName && (
               <div className="wizard-subtitle">dentro de · {parentProjectName}</div>
@@ -198,7 +198,7 @@ export function ProjectWizard({ open, parentProjectId, parentProjectName, onClos
           {step === 1 && (
             <div className="wizard-form">
               <label className="wizard-label">
-                Nombre del proyecto *
+                {parentProjectId ? "Nombre del proyecto *" : "Nombre del cliente *"}
                 <input
                   type="text" className="wizard-input"
                   placeholder="Ej: Lanzamiento Webinar Q2"
@@ -406,7 +406,7 @@ export function ProjectWizard({ open, parentProjectId, parentProjectName, onClos
               onClick={handleCreate}
               disabled={!canFinish || saving}
             >
-              {saving ? "Creando…" : "Crear proyecto ✓"}
+              {saving ? "Creando…" : (parentProjectId ? "Crear proyecto ✓" : "Crear cliente ✓")}
             </button>
           )}
         </div>

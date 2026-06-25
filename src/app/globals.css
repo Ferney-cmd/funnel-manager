@@ -72,6 +72,13 @@
   --topbar-border:#2D2849;
 }
 
+/* Dark mode: el item "unread" de notificaciones usaba --brand-light (lila muy
+   claro) con texto claro → ilegible. No tocamos la variable global porque
+   .ai-trigger-btn y .dup-option.active la usan con texto OSCURO (--brand-mid),
+   y oscurecerla los rompería. En su lugar redefinimos SOLO el fondo aquí. */
+[data-theme="dark"] .notif-item.unread { background: rgba(124, 58, 237, 0.18); }
+[data-theme="dark"] .notif-item.unread:hover { background: rgba(124, 58, 237, 0.28); }
+
 /* ── Base ────────────────────────────────────────────────────── */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -249,6 +256,67 @@ body {
 .topbar-badge-blocked {
   background: #FEE2E2;
   color: #991B1B;
+}
+
+/* ── Topbar: dropdown de estado del proyecto ─────────────────── */
+.tb-status-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.tb-status-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  cursor: pointer;
+  transition: filter .12s, background .12s;
+}
+.tb-status-trigger::after {
+  content: "▾";
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.7;
+}
+.tb-status-trigger:hover {
+  filter: brightness(0.96);
+}
+
+.tb-status-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 50;
+  min-width: 150px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+}
+
+.tb-status-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .1s;
+}
+.tb-status-option:hover {
+  background: var(--surface2);
+}
+.tb-status-option.active {
+  background: var(--brand-light);
+  color: var(--brand-mid);
+  font-weight: 600;
+}
+[data-theme="dark"] .tb-status-option.active {
+  background: rgba(124, 58, 237, 0.18);
+  color: var(--text);
 }
 
 .topbar-progress-wrap {
