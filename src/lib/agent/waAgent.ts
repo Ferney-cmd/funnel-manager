@@ -116,7 +116,10 @@ Reglas: usa la herramienta correcta; calcula fechas relativas a hoy; responde en
 }
 
 /* Resumen diario (reutiliza taskOps). Devuelve texto o null si no hay nada. */
-export async function buildDailyText(sb: SupabaseClient, userId: string): Promise<string | null> {
+/* Resumen diario + las tareas accionables (vencidas + hoy) para ponerles botones. */
+export async function buildDailySummary(
+  sb: SupabaseClient, userId: string,
+): Promise<{ text: string; tasks: ops.TaskRow[] } | null> {
   const [venc, hoy, sem] = await Promise.all([
     ops.listTasks(sb, userId, { scope: "vencidas" }),
     ops.listTasks(sb, userId, { scope: "hoy" }),
@@ -129,6 +132,11 @@ export async function buildDailyText(sb: SupabaseClient, userId: string): Promis
   if (venc.length) text += `\n\n⚠️ Vencidas (${venc.length})\n` + venc.slice(0, 8).map((t) => `• ${t.text}`).join("\n");
   if (hoy.length)  text += `\n\n📅 Para hoy (${hoy.length})\n` + hoy.slice(0, 8).map((t) => `• ${t.text}`).join("\n");
   if (sem.length)  text += `\n\n🗓️ Esta semana (${sem.length})\n` + sem.slice(0, 6).map((t) => `• ${t.text} (${t.due_date})`).join("\n");
-  text += `\n\nEscríbeme para marcar algo como hecho o agregar una tarea.`;
-  return text;
+  text += `\n\nToca ✅ para completar o 📅 para posponer 1 día. También puedes escribirme.`;
+  return { text, tasks: [...venc, ...hoy] };
+}
+
+export async function buildDailyText(sb: SupabaseClient, userId: string): Promise<string | null> {
+  const r = await buildDailySummary(sb, userId);
+  return r ? r.text : null;
 }

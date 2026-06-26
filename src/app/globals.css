@@ -3865,6 +3865,210 @@ body {
   font-size: 13px;
 }
 
+/* ── Mis Tareas · cabecera + stats + chips + tarjetas ── */
+.mt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 24px 4px;
+  flex-wrap: wrap;
+}
+.mt-header-title { display: flex; flex-direction: column; gap: 2px; }
+.mt-header-title h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+.mt-header-date { font-size: 12.5px; color: var(--text2); }
+.mt-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 7px 12px;
+  min-width: 240px;
+  flex: 0 1 320px;
+  transition: border-color .12s;
+}
+.mt-search:focus-within { border-color: var(--brand); }
+.mt-search-icon { font-size: 12px; opacity: .6; }
+.mt-search input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 13px;
+  color: var(--text);
+}
+.mt-search input::placeholder { color: var(--text3); }
+
+.mt-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  padding: 14px 24px;
+}
+.mt-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+.mt-stat-value { font-size: 26px; font-weight: 800; line-height: 1; }
+.mt-stat-label { font-size: 12px; color: var(--text2); }
+.mt-stat-bar {
+  margin-top: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--surface2);
+  overflow: hidden;
+}
+.mt-stat-bar-fill { display: block; height: 100%; border-radius: 999px; transition: width .25s; }
+
+.mt-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 24px 10px;
+  flex-wrap: wrap;
+}
+.mt-filter-label { font-size: 12.5px; color: var(--text2); margin-right: 2px; }
+.mt-chip {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.mt-chip:hover { color: var(--text); border-color: var(--border2); }
+.mt-chip.active {
+  color: #fff;
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.mt-pending-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text3);
+}
+
+.mt-list { display: flex; flex-direction: column; padding-bottom: 24px; }
+
+.mt-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 6px 24px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: border-color .12s, box-shadow .12s, transform .06s;
+}
+.mt-card:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(124, 58, 237, 0.08); }
+.mt-card.done { opacity: .6; }
+.mt-card-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  margin-top: 6px;
+}
+.mt-card .mt-check { margin-top: 1px; }
+.mt-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 7px; }
+.mt-card-title { font-size: 13.5px; font-weight: 600; color: var(--text); }
+.mt-card-title.done { text-decoration: line-through; color: var(--text3); }
+.mt-card-tags { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.mt-tag {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+.mt-tag-project { max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.mt-tag-priority { border: none; }
+.mt-tag-date { background: transparent; }
+.mt-card-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: #fff;
+  margin-top: 2px;
+}
+
+.mt-header-actions { display: flex; align-items: center; gap: 10px; flex: 0 1 auto; }
+.mt-new-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: background .12s;
+  white-space: nowrap;
+}
+.mt-new-btn:hover { background: var(--brand-mid); }
+
+/* QuickTaskModal */
+.qt-toggle { display: flex; gap: 8px; }
+.qt-toggle-btn {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: all .12s;
+}
+.qt-toggle-btn:hover { color: var(--text); border-color: var(--border2); }
+.qt-toggle-btn.active {
+  color: var(--brand);
+  border-color: var(--brand);
+  background: var(--brand-light);
+}
+[data-theme="dark"] .qt-toggle-btn.active {
+  color: var(--text);
+  background: rgba(124, 58, 237, 0.18);
+}
+.qt-hint { margin: 10px 2px 0; font-size: 12px; color: var(--text3); }
+.qt-fields { display: flex; gap: 10px; margin-top: 10px; }
+.qt-field { flex: 1; display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.qt-field > span { font-size: 12px; color: var(--text2); }
+
+@media (max-width: 860px) {
+  .mt-stats { grid-template-columns: repeat(2, 1fr); }
+}
+
 /* ── Kanban view ─────────────────────────────────────── */
 .kb-wrap {
   display: flex;

@@ -191,17 +191,60 @@ export async function createTask(
   return { ok: true, task: { id, text: titulo, done: false, due_date: due ?? null, priority: prioridad, project: null, module: null, overdue: false } };
 }
 
-/* Busca una tarea del usuario por texto aproximado. */
+/* Tokeniza ignorando palabras vacías; conserva números (ej. "7"). */
+const STOPWORDS = new Set([
+  "la","el","los","las","un","una","unos","unas","de","del","y","o","a","al","en","con","para",
+  "que","como","mi","mis","su","sus","tarea","tareas","por","lo","le","se","es",
+]);
+function refTokens(s: string): string[] {
+  return norm(s).split(/[^a-z0-9]+/).filter((w) => (w.length >= 2 || /^\d+$/.test(w)) && !STOPWORDS.has(w));
+}
+/* Puntúa cuántos tokens de la consulta aparecen en el texto de la tarea. */
+function matchScore(qToks: string[], text: string): number {
+  const tt = norm(text);
+  const twords = tt.split(/[^a-z0-9]+/).filter(Boolean);
+  let hit = 0;
+  for (const q of qToks) {
+    if (tt.includes(q)) { hit += 2; continue; }
+    // prefijo común (filtrar/filtra, automatiza/automatización…)
+    if (twords.some((w) => w.length >= 4 && q.length >= 4 && (w.startsWith(q.slice(0, 4)) || q.startsWith(w.slice(0, 4))))) hit += 1;
+  }
+  return hit;
+}
+
+/* Busca una tarea del usuario por texto aproximado (por tokens, tolerante). */
 async function findUserTask(sb: SupabaseClient, userId: string, ref: string, done: boolean) {
   const q = (ref || "").trim();
-  if (!q) return { error: "Indica a qué tarea te refieres." };
+  const qToks = refTokens(q);
+  if (!q || !qToks.length) return { error: "Indica a qué tarea te refieres." };
+
   const { data } = await sb.from("node_tasks")
-    .select("id, text").eq("assigned_to", userId).eq("done", done)
-    .ilike("text", `%${q}%`).limit(6);
-  const rows = data ?? [];
-  if (rows.length === 0) return { error: `No encontré ninguna tarea ${done ? "completada" : "pendiente"} que coincida con "${q}".` };
-  if (rows.length > 1) return { ambiguous: rows.map((r: any) => r.text) };
-  return { task: rows[0] as { id: string; text: string } };
+    .select("id, text").eq("assigned_to", userId).eq("done", done).limit(300);
+  const rows = (data ?? []) as { id: string; text: string }[];
+  if (!rows.length) return { error: `No tienes tareas ${done ? "completadas" : "pendientes"}.` };
+
+  const scored = rows
+    .map((r) => ({ r, s: matchScore(qToks, r.text) }))
+    .filter((x) => x.s > 0)
+    .sort((a, b) => b.s - a.s);
+
+  if (!scored.length) {
+    return { error: `No encontré ninguna tarea ${done ? "completada" : "pendiente"} que coincida con "${q}".` };
+  }
+
+  // exige cubrir al menos ~60% de los tokens (mínimo 1 token fuerte)
+  const maxScore = qToks.length * 2;
+  const threshold = Math.max(2, Math.ceil(maxScore * 0.6));
+  const best = scored[0].s;
+  if (best < threshold) {
+    const tops = scored.slice(0, 6).map((x) => x.r.text);
+    if (tops.length === 1) return { task: scored[0].r };
+    return { ambiguous: tops };
+  }
+
+  const top = scored.filter((x) => x.s === best);
+  if (top.length === 1) return { task: top[0].r };
+  return { ambiguous: top.slice(0, 6).map((x) => x.r.text) };
 }
 
 export async function completeTask(sb: SupabaseClient, userId: string, ref: string): Promise<{ ok: true; text: string } | { error: string } | { ambiguous: string[] }> {

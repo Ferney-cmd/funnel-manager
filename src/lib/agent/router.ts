@@ -59,10 +59,29 @@ export function parseCommand(textRaw: string): Command {
     return { tipo: "modulos", projectName: extractProject(t) };
   }
 
-  // Completar
-  let m = t.match(/\b(ya\s+)?(termine|complete|complet[ée]|hice|acab[ée]|finalice|marca(?:r)?\s+como\s+(?:hecho|hecha|completad[ao])|completa(?:r)?|listo|hecho|hecha)\b\s*(.*)$/);
-  if (m && (m[3]?.trim() || /\b(termine|complete|hice|acabe|finalice)\b/.test(t))) {
-    const ref = (m[3] || "").replace(/^(la|el|tarea|de)\s+/i, "").trim();
+  // Completar — limpia prefijos de mando del ref (solo palabras completas)
+  const LEAD = new Set(["ya","la","el","los","las","tarea","de","del","esa","esta","ese","este","mi"]);
+  const cleanRef = (s: string) => {
+    const words = (s || "").trim().replace(/^[:\s]+/, "").split(/\s+/);
+    while (words.length && (LEAD.has(words[0]) || words[0] === ":")) words.shift();
+    return words.join(" ")
+      .replace(/\bcomo\s+(hecho|hecha|completad[ao]|realizad[ao]|terminad[ao]|finalizad[ao]|lista|listo)\b/gi, "")
+      .replace(/\s{2,}/g, " ").trim();
+  };
+  const STATUS = "(?:hecho|hecha|completad[ao]|realizad[ao]|terminad[ao]|finalizad[ao]|lista|listo)";
+  // A) "marca(r) [la tarea] como <estado> <ref>"
+  let m = t.match(new RegExp(`\\b(?:marca(?:r|la|lo)?|pon(?:er|la|lo)?)\\s+(?:la\\s+|el\\s+)?(?:tarea\\s+)?como\\s+${STATUS}\\s+(.+)$`));
+  if (m && cleanRef(m[1])) return { tipo: "completar", ref: cleanRef(m[1]) };
+  // B) "marca(r) <ref> como <estado>"
+  m = t.match(new RegExp(`\\b(?:marca(?:r|la|lo)?|pon(?:er|la|lo)?)\\s+(.+?)\\s+como\\s+${STATUS}\\b`));
+  if (m && cleanRef(m[1])) return { tipo: "completar", ref: cleanRef(m[1]) };
+  // B2) "marca(r) <ref> como … <estado>" (estado no contiguo, p.ej. "como realiza o completada")
+  m = t.match(new RegExp(`^\\s*marca(?:r|la|lo)?\\s+(.+?)\\s+como\\s+.*\\b${STATUS}\\b`));
+  if (m && cleanRef(m[1])) return { tipo: "completar", ref: cleanRef(m[1]) };
+  // C) verbos directos: "ya terminé / completé / completa(r) / hice / acabé / finalicé <ref>"
+  m = t.match(/\b(?:ya\s+)?(termin[eé]|complet[eé]|completa(?:r)?|complete|hice|acab[eé]|finalic[eé]|finalice)\b\s*(.*)$/);
+  if (m) {
+    const ref = cleanRef(m[2] || "");
     if (ref) return { tipo: "completar", ref };
   }
 

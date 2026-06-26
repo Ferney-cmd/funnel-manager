@@ -7,18 +7,10 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { runUserAgent } from "@/lib/agent/waAgent";
 import { parseCommand } from "@/lib/agent/router";
 import { executeCommand } from "@/lib/agent/engine";
-import { completeTaskById, snoozeTaskById, type TaskRow } from "@/lib/agent/taskOps";
+import { completeTaskById, snoozeTaskById } from "@/lib/agent/taskOps";
+import { taskButtons } from "@/lib/agent/tgUi";
 
 const BOT = process.env.TELEGRAM_BOT_TOKEN || "";
-
-function buttonsFor(tasks?: TaskRow[]) {
-  if (!tasks || !tasks.length) return undefined;
-  const rows = tasks.slice(0, 6).map((t) => ([
-    { text: "✅ " + t.text.slice(0, 22), callback_data: "d:" + t.id },
-    { text: "📅+1d", callback_data: "s:" + t.id },
-  ]));
-  return { inline_keyboard: rows };
-}
 
 async function sendMessage(chatId: number | string, text: string, reply_markup?: any) {
   try {
@@ -102,7 +94,7 @@ export async function POST(req: Request) {
   const cmd = parseCommand(text);
   if (cmd.tipo !== "desconocido") {
     const res = await executeCommand(sb, link.user_id, cmd);
-    await sendMessage(chatId, res.reply, buttonsFor(res.tasks));
+    await sendMessage(chatId, res.reply, taskButtons(res.tasks));
     return NextResponse.json({ ok: true });
   }
 

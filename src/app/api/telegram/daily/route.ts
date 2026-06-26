@@ -4,7 +4,8 @@ export const maxDuration = 120;
 
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { buildDailyText } from "@/lib/agent/waAgent";
+import { buildDailySummary } from "@/lib/agent/waAgent";
+import { taskButtons } from "@/lib/agent/tgUi";
 
 const BOT = process.env.TELEGRAM_BOT_TOKEN || "";
 
@@ -20,13 +21,18 @@ export async function POST(req: Request) {
   const { data: links } = await sb.from("telegram_links").select("user_id, chat_id");
   let sent = 0;
   for (const link of (links ?? [])) {
-    const text = await buildDailyText(sb, link.user_id);
-    if (!text) continue;
+    const summary = await buildDailySummary(sb, link.user_id);
+    if (!summary) continue;
     try {
       await fetch(`https://api.telegram.org/bot${BOT}/sendMessage`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ chat_id: link.chat_id, text }),
+        body: JSON.stringify({
+          chat_id: link.chat_id,
+          text: summary.text,
+          reply_markup: taskButtons(summary.tasks),
+          disable_web_page_preview: true,
+        }),
       });
       sent++;
     } catch { /* ignore */ }

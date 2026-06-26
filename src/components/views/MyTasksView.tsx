@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PRIORITY_COLORS } from "@/lib/constants";
-import type { Profile } from "@/lib/profiles";
+import { getInitials, type Profile } from "@/lib/profiles";
+import { QuickTaskModal } from "./QuickTaskModal";
 
 interface MyTasksViewProps {
   me: Profile | null;
@@ -42,15 +43,35 @@ function parseDue(dueDate: string): Date {
   return new Date(dueDate + "T12:00:00");
 }
 
-function formatDue(dueDate: string | null): string {
-  if (!dueDate) return "—";
+/** Fecha relativa estilo "Ayer" / "Hoy" / "Mañana" / "26 jun". */
+function formatDueRelative(dueDate: string | null): string {
+  if (!dueDate) return "Sin fecha";
+  const today = startOfToday();
+  const due = parseDue(dueDate);
+  due.setHours(0, 0, 0, 0);
+  const diff = Math.round((due.getTime() - today.getTime()) / 86400000);
+  if (diff === 0) return "Hoy";
+  if (diff === -1) return "Ayer";
+  if (diff === 1) return "Mañana";
+  if (diff < -1) return `Hace ${-diff} días`;
   try {
-    return parseDue(dueDate).toLocaleDateString("es-CO", {
-      day: "2-digit",
-      month: "short",
-    });
+    return parseDue(dueDate).toLocaleDateString("es-CO", { day: "2-digit", month: "short" });
   } catch {
     return dueDate;
+  }
+}
+
+function longTodayLabel(): string {
+  try {
+    const s = new Date().toLocaleDateString("es-CO", {
+      weekday: "long",
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  } catch {
+    return "";
   }
 }
 
@@ -58,7 +79,7 @@ type SectionKey = "overdue" | "today" | "week" | "upcoming" | "nodate";
 
 const SECTION_ORDER: { key: SectionKey; label: string; reddish?: boolean }[] = [
   { key: "overdue", label: "Atrasadas", reddish: true },
-  { key: "today", label: "Hoy" },
+  { key: "today", label: "Urgente / Hoy" },
   { key: "week", label: "Esta semana" },
   { key: "upcoming", label: "Próximas" },
   { key: "nodate", label: "Sin fecha" },
@@ -75,54 +96,61 @@ function classifyTask(t: MyTask, today: Date, weekEnd: Date): SectionKey {
   return "upcoming";
 }
 
+type FilterKey = "all" | "urgent" | "overdue" | "today" | "nodate";
+
+const FILTERS: { key: FilterKey; label: string }[] = [
+  { key: "all", label: "Todas" },
+  { key: "urgent", label: "Urgentes" },
+  { key: "overdue", label: "Vencidas" },
+  { key: "today", label: "Hoy" },
+  { key: "nodate", label: "Sin fecha" },
+];
+
 export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksViewProps) {
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [completedOpen, setCompletedOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<FilterKey>("all");
+  const [quickOpen, setQuickOpen] = useState(false);
 
-  useEffect(() => {
+  const loadTasks = useCallback(async () => {
     const meId = me?.id;
     if (!meId) {
       setTasks([]);
       setLoading(false);
       return;
     }
-    let cancelled = false;
     setLoading(true);
     const supabase = createClient();
-    (async () => {
-      const { data } = await supabase
-        .from("node_tasks")
-        .select(
-          "id, text, done, due_date, priority, node_id, project_id, funnel_nodes(title, icon), projects(name)"
-        )
-        .eq("assigned_to", meId)
-        .order("due_date", { ascending: true });
+    const { data } = await supabase
+      .from("node_tasks")
+      .select(
+        "id, text, done, due_date, priority, node_id, project_id, funnel_nodes(title, icon), projects(name)"
+      )
+      .eq("assigned_to", meId)
+      .order("due_date", { ascending: true });
 
-      if (cancelled) return;
-
-      const mapped: MyTask[] = (data || []).map((r: any) => {
-        const node = firstOf<{ title?: string; icon?: string }>(r.funnel_nodes);
-        const proj = firstOf<{ name?: string }>(r.projects);
-        return {
-          id: r.id,
-          text: r.text,
-          done: !!r.done,
-          dueDate: r.due_date ?? null,
-          priority: (r.priority ?? "normal") as Priority,
-          projectId: r.project_id,
-          nodeTitle: node?.title ?? "",
-          nodeIcon: node?.icon ?? "📦",
-          projectName: proj?.name ?? "",
-        };
-      });
-      setTasks(mapped);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
+    const mapped: MyTask[] = (data || []).map((r: any) => {
+      const node = firstOf<{ title?: string; icon?: string }>(r.funnel_nodes);
+      const proj = firstOf<{ name?: string }>(r.projects);
+      return {
+        id: r.id,
+        text: r.text,
+        done: !!r.done,
+        dueDate: r.due_date ?? null,
+        priority: (r.priority ?? "normal") as Priority,
+        projectId: r.project_id,
+        nodeTitle: node?.title ?? "",
+        nodeIcon: node?.icon ?? "📦",
+        projectName: proj?.name ?? "",
+      };
+    });
+    setTasks(mapped);
+    setLoading(false);
   }, [me?.id]);
+
+  useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const toggleDone = (id: string) => {
     const target = tasks.find((t) => t.id === id);
@@ -143,13 +171,37 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
       });
   };
 
-  const { sections, completed, pendingCount } = useMemo(() => {
+  const { sections, completed, pendingCount, stats } = useMemo(() => {
     const today = startOfToday();
     const weekEnd = new Date(today);
     weekEnd.setDate(weekEnd.getDate() + 7);
 
-    const pending = tasks.filter((t) => !t.done);
-    const done = tasks.filter((t) => t.done);
+    const q = query.trim().toLowerCase();
+    const matchesSearch = (t: MyTask) =>
+      !q ||
+      t.text.toLowerCase().includes(q) ||
+      t.projectName.toLowerCase().includes(q) ||
+      t.nodeTitle.toLowerCase().includes(q);
+
+    const matchesFilter = (t: MyTask): boolean => {
+      switch (filter) {
+        case "urgent":
+          return t.priority === "urgent" || t.priority === "high";
+        case "overdue":
+          return classifyTask(t, today, weekEnd) === "overdue";
+        case "today":
+          return classifyTask(t, today, weekEnd) === "today";
+        case "nodate":
+          return !t.dueDate;
+        default:
+          return true;
+      }
+    };
+
+    const pendingAll = tasks.filter((t) => !t.done);
+    const visible = tasks.filter((t) => matchesSearch(t) && matchesFilter(t));
+    const pending = visible.filter((t) => !t.done);
+    const done = visible.filter((t) => t.done);
 
     const grouped: Record<SectionKey, MyTask[]> = {
       overdue: [],
@@ -158,13 +210,34 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
       upcoming: [],
       nodate: [],
     };
-    for (const t of pending) {
-      grouped[classifyTask(t, today, weekEnd)].push(t);
-    }
-    return { sections: grouped, completed: done, pendingCount: pending.length };
-  }, [tasks]);
+    for (const t of pending) grouped[classifyTask(t, today, weekEnd)].push(t);
 
-  const renderRow = (t: MyTask) => {
+    // Stats sobre TODO (no afectadas por filtro/búsqueda)
+    const overdueN = pendingAll.filter((t) => classifyTask(t, today, weekEnd) === "overdue").length;
+    const todayN = pendingAll.filter((t) => classifyTask(t, today, weekEnd) === "today").length;
+    const completedN = tasks.filter((t) => t.done).length;
+    const projectsN = new Set(pendingAll.map((t) => t.projectId)).size;
+
+    return {
+      sections: grouped,
+      completed: done,
+      pendingCount: pending.length,
+      stats: { todayN, overdueN, completedN, projectsN },
+    };
+  }, [tasks, query, filter]);
+
+  const statCards = [
+    { value: stats.todayN, label: "Tareas hoy", color: "#7C3AED" },
+    { value: stats.overdueN, label: "Vencidas", color: OVERDUE_COLOR },
+    { value: stats.completedN, label: "Completadas", color: "#10B981" },
+    { value: stats.projectsN, label: "Proyectos con tareas", color: "#6366F1" },
+  ];
+  const maxStat = Math.max(1, ...statCards.map((s) => s.value));
+
+  const myInitials = getInitials(me?.full_name || me?.email || "");
+  const myColor = me?.color || "#7C3AED";
+
+  const renderCard = (t: MyTask, sectionReddish?: boolean) => {
     const pc = PRIORITY_COLORS[t.priority] ?? PRIORITY_COLORS.normal;
     const today = startOfToday();
     let dateReddish = false;
@@ -176,11 +249,12 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
     return (
       <div
         key={t.id}
-        className="mt-row"
+        className={`mt-card ${t.done ? "done" : ""}`}
         onClick={() => onOpenTaskProject(t.projectId)}
         role="button"
         tabIndex={0}
       >
+        <span className="mt-card-dot" style={{ background: sectionReddish ? OVERDUE_COLOR : pc.fg }} />
         <button
           className={`mt-check al-check ${t.done ? "done" : ""}`}
           title={t.done ? "Marcar pendiente" : "Marcar completada"}
@@ -189,18 +263,30 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
             toggleDone(t.id);
           }}
         />
-        <span className={`mt-title ${t.done ? "done" : ""}`}>{t.text}</span>
-        <span className="mt-origin">
-          📁 {t.projectName} · {t.nodeIcon} {t.nodeTitle}
-        </span>
-        <span
-          className="mt-date"
-          style={dateReddish ? { color: OVERDUE_COLOR, fontWeight: 600 } : undefined}
-        >
-          {formatDue(t.dueDate)}
-        </span>
-        <span className="mt-priority" style={{ background: pc.bg, color: pc.fg }}>
-          {pc.label}
+        <div className="mt-card-main">
+          <span className={`mt-card-title ${t.done ? "done" : ""}`}>{t.text}</span>
+          <div className="mt-card-tags">
+            {t.projectName && (
+              <span className="mt-tag mt-tag-project">📁 {t.projectName}</span>
+            )}
+            {t.nodeTitle && (
+              <span className="mt-tag">{t.nodeIcon} {t.nodeTitle}</span>
+            )}
+            <span className="mt-tag mt-tag-priority" style={{ background: pc.bg, color: pc.fg }}>
+              {pc.label}
+            </span>
+            {t.dueDate && (
+              <span
+                className="mt-tag mt-tag-date"
+                style={dateReddish ? { color: OVERDUE_COLOR, borderColor: OVERDUE_COLOR + "55" } : undefined}
+              >
+                🕑 {formatDueRelative(t.dueDate)}
+              </span>
+            )}
+          </div>
+        </div>
+        <span className="mt-card-avatar" style={{ background: myColor }} title={me?.full_name || ""}>
+          {myInitials}
         </span>
       </div>
     );
@@ -219,33 +305,85 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
   }
 
   const hasAny = tasks.length > 0;
+  const anyVisible =
+    SECTION_ORDER.some(({ key }) => sections[key].length > 0) || completed.length > 0;
 
   return (
     <div className="mt-wrap">
       <div className="view-back-bar">
         <button className="bt-back-btn" onClick={() => onSelectView("canvas")}>← Embudo</button>
         <span className="view-back-title">Mis Tareas</span>
-        {hasAny && (
-          <span className="mt-section-count">{pendingCount} pendientes</span>
-        )}
+      </div>
+
+      {/* Cabecera: título + fecha + buscador */}
+      <div className="mt-header">
+        <div className="mt-header-title">
+          <h1>Mis tareas</h1>
+          <span className="mt-header-date">{longTodayLabel()}</span>
+        </div>
+        <div className="mt-header-actions">
+          <div className="mt-search">
+            <span className="mt-search-icon">🔍</span>
+            <input
+              type="text"
+              placeholder="Buscar tarea..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <button className="mt-new-btn" onClick={() => setQuickOpen(true)}>
+            + Nueva tarea
+          </button>
+        </div>
+      </div>
+
+      {/* Tarjetas de stats */}
+      <div className="mt-stats">
+        {statCards.map((s) => (
+          <div className="mt-stat" key={s.label}>
+            <span className="mt-stat-value" style={{ color: s.color }}>{s.value}</span>
+            <span className="mt-stat-label">{s.label}</span>
+            <span className="mt-stat-bar">
+              <span
+                className="mt-stat-bar-fill"
+                style={{ width: `${Math.round((s.value / maxStat) * 100)}%`, background: s.color }}
+              />
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {/* Chips de filtro */}
+      <div className="mt-filters">
+        <span className="mt-filter-label">Filtrar:</span>
+        {FILTERS.map((f) => (
+          <button
+            key={f.key}
+            className={`mt-chip ${filter === f.key ? "active" : ""}`}
+            onClick={() => setFilter(f.key)}
+          >
+            {f.label}
+          </button>
+        ))}
+        {hasAny && <span className="mt-pending-count">{pendingCount} pendientes</span>}
       </div>
 
       {!hasAny ? (
         <div className="mt-empty">No tienes tareas asignadas</div>
+      ) : !anyVisible ? (
+        <div className="mt-empty">Ninguna tarea coincide con el filtro</div>
       ) : (
-        <>
+        <div className="mt-list">
           {SECTION_ORDER.map(({ key, label, reddish }) => {
             const items = sections[key];
             if (!items.length) return null;
             return (
               <div key={key} className="mt-section">
                 <div className="mt-section-header">
-                  <span style={reddish ? { color: OVERDUE_COLOR } : undefined}>
-                    {label}
-                  </span>
+                  <span style={reddish ? { color: OVERDUE_COLOR } : undefined}>{label}</span>
                   <span className="mt-section-count">{items.length}</span>
                 </div>
-                {items.map(renderRow)}
+                {items.map((t) => renderCard(t, reddish))}
               </div>
             );
           })}
@@ -259,10 +397,18 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
                 <span>{completedOpen ? "▾" : "▸"} Completadas</span>
                 <span className="mt-section-count">{completed.length}</span>
               </button>
-              {completedOpen && completed.map(renderRow)}
+              {completedOpen && completed.map((t) => renderCard(t))}
             </div>
           )}
-        </>
+        </div>
+      )}
+
+      {quickOpen && me && (
+        <QuickTaskModal
+          me={me}
+          onClose={() => setQuickOpen(false)}
+          onCreated={loadTasks}
+        />
       )}
     </div>
   );
