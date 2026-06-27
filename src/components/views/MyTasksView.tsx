@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { PRIORITY_COLORS } from "@/lib/constants";
 import { getInitials, type Profile } from "@/lib/profiles";
-import { QuickTaskModal } from "./QuickTaskModal";
+import { QuickTaskModal, INBOX_NAME, type EditTask } from "./QuickTaskModal";
 
 interface MyTasksViewProps {
   me: Profile | null;
@@ -21,6 +21,7 @@ interface MyTask {
   dueDate: string | null;
   priority: Priority;
   projectId: string;
+  nodeId: string;
   nodeTitle: string;
   nodeIcon: string;
   projectName: string;
@@ -113,6 +114,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [quickOpen, setQuickOpen] = useState(false);
+  const [editTask, setEditTask] = useState<MyTask | null>(null);
 
   const loadTasks = useCallback(async () => {
     const meId = me?.id;
@@ -141,6 +143,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
         dueDate: r.due_date ?? null,
         priority: (r.priority ?? "normal") as Priority,
         projectId: r.project_id,
+        nodeId: r.node_id,
         nodeTitle: node?.title ?? "",
         nodeIcon: node?.icon ?? "📦",
         projectName: proj?.name ?? "",
@@ -236,6 +239,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
 
   const myInitials = getInitials(me?.full_name || me?.email || "");
   const myColor = me?.color || "#7C3AED";
+  const myFirstName = (me?.full_name || me?.email || "").split(/[\s@]/)[0];
 
   const renderCard = (t: MyTask, sectionReddish?: boolean) => {
     const pc = PRIORITY_COLORS[t.priority] ?? PRIORITY_COLORS.normal;
@@ -246,13 +250,15 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
       dueDay.setHours(0, 0, 0, 0);
       dateReddish = dueDay.getTime() <= today.getTime();
     }
+    const isPersonal = t.projectName === INBOX_NAME;
     return (
       <div
         key={t.id}
         className={`mt-card ${t.done ? "done" : ""}`}
-        onClick={() => onOpenTaskProject(t.projectId)}
+        onClick={() => setEditTask(t)}
         role="button"
         tabIndex={0}
+        title="Editar tarea"
       >
         <span className="mt-card-dot" style={{ background: sectionReddish ? OVERDUE_COLOR : pc.fg }} />
         <button
@@ -266,10 +272,18 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
         <div className="mt-card-main">
           <span className={`mt-card-title ${t.done ? "done" : ""}`}>{t.text}</span>
           <div className="mt-card-tags">
-            {t.projectName && (
-              <span className="mt-tag mt-tag-project">📁 {t.projectName}</span>
+            {isPersonal ? (
+              <span className="mt-tag mt-tag-personal">🏠 Personal</span>
+            ) : (
+              <span
+                className="mt-tag mt-tag-project"
+                onClick={(e) => { e.stopPropagation(); onOpenTaskProject(t.projectId); }}
+                title="Abrir proyecto"
+              >
+                📁 {t.projectName}
+              </span>
             )}
-            {t.nodeTitle && (
+            {!isPersonal && t.nodeTitle && (
               <span className="mt-tag">{t.nodeIcon} {t.nodeTitle}</span>
             )}
             <span className="mt-tag mt-tag-priority" style={{ background: pc.bg, color: pc.fg }}>
@@ -285,8 +299,9 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
             )}
           </div>
         </div>
-        <span className="mt-card-avatar" style={{ background: myColor }} title={me?.full_name || ""}>
-          {myInitials}
+        <span className="mt-card-assignee">
+          <span className="mt-card-avatar" style={{ background: myColor }}>{myInitials}</span>
+          <span className="mt-card-assignee-name">{myFirstName}</span>
         </span>
       </div>
     );
@@ -407,7 +422,24 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
         <QuickTaskModal
           me={me}
           onClose={() => setQuickOpen(false)}
-          onCreated={loadTasks}
+          onSaved={loadTasks}
+        />
+      )}
+
+      {editTask && me && (
+        <QuickTaskModal
+          me={me}
+          task={{
+            id: editTask.id,
+            text: editTask.text,
+            dueDate: editTask.dueDate,
+            priority: editTask.priority,
+            projectId: editTask.projectId,
+            nodeId: editTask.nodeId,
+            projectName: editTask.projectName,
+          } as EditTask}
+          onClose={() => setEditTask(null)}
+          onSaved={loadTasks}
         />
       )}
     </div>

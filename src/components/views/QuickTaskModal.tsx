@@ -6,7 +6,7 @@ import { getInbox, listProjects } from "@/lib/agent/taskOps";
 import { PRIORITY_COLORS } from "@/lib/constants";
 import type { Profile } from "@/lib/profiles";
 
-const INBOX_NAME = "📥 Bandeja de entrada";
+export const INBOX_NAME = "📥 Bandeja de entrada";
 
 interface ProjectRow {
   id: string;
@@ -22,29 +22,43 @@ interface ModuleRow {
 type Priority = keyof typeof PRIORITY_COLORS;
 type TaskType = "personal" | "project";
 
+export interface EditTask {
+  id: string;
+  text: string;
+  dueDate: string | null;
+  priority: Priority;
+  projectId: string;
+  nodeId: string;
+  projectName: string;
+}
+
 interface QuickTaskModalProps {
   me: Profile;
+  task?: EditTask | null; // si viene → modo edición
   onClose: () => void;
-  onCreated: () => void;
+  onSaved: () => void;
 }
 
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
-export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) {
+export function QuickTaskModal({ me, task, onClose, onSaved }: QuickTaskModalProps) {
   const supabase = createClient();
+  const editing = !!task;
+  const startsPersonal = !task || task.projectName === INBOX_NAME;
 
-  const [titulo, setTitulo] = useState("");
-  const [type, setType] = useState<TaskType>("personal");
+  const [titulo, setTitulo] = useState(task?.text ?? "");
+  const [type, setType] = useState<TaskType>(startsPersonal ? "personal" : "project");
   const [projects, setProjects] = useState<ProjectRow[]>([]);
-  const [projectId, setProjectId] = useState("");
+  const [projectId, setProjectId] = useState(startsPersonal ? "" : task!.projectId);
   const [modules, setModules] = useState<ModuleRow[]>([]);
-  const [moduleId, setModuleId] = useState("");
-  const [fecha, setFecha] = useState("");
-  const [priority, setPriority] = useState<Priority>("normal");
+  const [moduleId, setModuleId] = useState(startsPersonal ? "" : task!.nodeId);
+  const [fecha, setFecha] = useState(task?.dueDate ?? "");
+  const [priority, setPriority] = useState<Priority>(task?.priority ?? "normal");
   const [loadingModules, setLoadingModules] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Cargar proyectos accesibles (sin la bandeja de entrada)
@@ -62,7 +76,7 @@ export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) 
     return () => { cancelled = true; };
   }, [me.id, supabase]);
 
-  // Cargar módulos del proyecto elegido
+  // Cargar módulos del proyecto elegido (preselecciona el actual al editar)
   useEffect(() => {
     if (type !== "project" || !projectId) {
       setModules([]);
@@ -80,7 +94,7 @@ export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) 
       if (cancelled) return;
       const mods = (data ?? []) as ModuleRow[];
       setModules(mods);
-      setModuleId(mods[0]?.id ?? "");
+      setModuleId((prev) => (prev && mods.some((m) => m.id === prev) ? prev : mods[0]?.id ?? ""));
       setLoadingModules(false);
     })();
     return () => { cancelled = true; };
@@ -89,57 +103,69 @@ export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) 
   const canSave =
     titulo.trim().length > 0 &&
     !saving &&
+    !deleting &&
     (type === "personal" || (!!projectId && !!moduleId));
+
+  async function resolveTarget(): Promise<{ nodeId: string; projectId: string } | { error: string }> {
+    if (type === "personal") {
+      const inbox = await getInbox(supabase, me.id);
+      if ("error" in inbox) return { error: inbox.error };
+      return { nodeId: inbox.nodeId, projectId: inbox.projectId };
+    }
+    return { nodeId: moduleId, projectId };
+  }
 
   async function handleSubmit() {
     if (!canSave) return;
     setSaving(true);
     setError(null);
 
-    // Resolver módulo y proyecto destino
-    let nodeId: string;
-    let destProjectId: string;
-    if (type === "personal") {
-      const inbox = await getInbox(supabase, me.id);
-      if ("error" in inbox) {
-        setError(inbox.error);
-        setSaving(false);
-        return;
-      }
-      nodeId = inbox.nodeId;
-      destProjectId = inbox.projectId;
-    } else {
-      nodeId = moduleId;
-      destProjectId = projectId;
-    }
+    const target = await resolveTarget();
+    if ("error" in target) { setError(target.error); setSaving(false); return; }
 
     const due = /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null;
-    const { data: existing } = await supabase
-      .from("node_tasks")
-      .select("ord")
-      .eq("node_id", nodeId);
-    const ord = (existing ?? []).length;
 
-    const id = `t-${uid()}`;
-    const { error: insErr } = await supabase.from("node_tasks").insert({
-      id,
-      node_id: nodeId,
-      project_id: destProjectId,
-      text: titulo.trim().slice(0, 300),
-      done: false,
-      ord,
-      priority,
-      due_date: due,
-      assigned_to: me.id,
-      description: "",
-    });
-
-    if (insErr) {
-      setError("No se pudo crear la tarea: " + insErr.message);
-      setSaving(false);
-      return;
+    if (editing) {
+      const { error: updErr } = await supabase
+        .from("node_tasks")
+        .update({
+          text: titulo.trim().slice(0, 300),
+          due_date: due,
+          priority,
+          node_id: target.nodeId,
+          project_id: target.projectId,
+        })
+        .eq("id", task!.id);
+      if (updErr) { setError("No se pudo guardar: " + updErr.message); setSaving(false); return; }
+    } else {
+      const { data: existing } = await supabase.from("node_tasks").select("ord").eq("node_id", target.nodeId);
+      const ord = (existing ?? []).length;
+      const { error: insErr } = await supabase.from("node_tasks").insert({
+        id: `t-${uid()}`,
+        node_id: target.nodeId,
+        project_id: target.projectId,
+        text: titulo.trim().slice(0, 300),
+        done: false,
+        ord,
+        priority,
+        due_date: due,
+        assigned_to: me.id,
+        description: "",
+      });
+      if (insErr) { setError("No se pudo crear la tarea: " + insErr.message); setSaving(false); return; }
     }
-    onCreated();
+    onSaved();
+    onClose();
+  }
+
+  async function handleDelete() {
+    if (!editing) return;
+    if (!window.confirm(`¿Eliminar la tarea "${task!.text}"? No se puede deshacer.`)) return;
+    setDeleting(true);
+    setError(null);
+    const { error: delErr } = await supabase.from("node_tasks").delete().eq("id", task!.id);
+    if (delErr) { setError("No se pudo eliminar: " + delErr.message); setDeleting(false); return; }
+    onSaved();
     onClose();
   }
 
@@ -148,7 +174,7 @@ export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) 
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div>
-            <div className="modal-title">Nueva tarea</div>
+            <div className="modal-title">{editing ? "Editar tarea" : "Nueva tarea"}</div>
             <div className="modal-subtitle">Personal o asignada a un módulo de un proyecto</div>
           </div>
           <button className="modal-close" onClick={onClose}>✕</button>
@@ -262,11 +288,21 @@ export function QuickTaskModal({ me, onClose, onCreated }: QuickTaskModalProps) 
         )}
 
         <div className="modal-footer">
-          <button className="modal-btn-secondary" onClick={onClose} disabled={saving}>
+          {editing && (
+            <button
+              className="modal-btn-secondary"
+              onClick={handleDelete}
+              disabled={saving || deleting}
+              style={{ marginRight: "auto", color: "#E24B4A", borderColor: "#E24B4A55" }}
+            >
+              {deleting ? "Eliminando…" : "🗑 Eliminar"}
+            </button>
+          )}
+          <button className="modal-btn-secondary" onClick={onClose} disabled={saving || deleting}>
             Cancelar
           </button>
           <button className="modal-btn-primary" onClick={handleSubmit} disabled={!canSave}>
-            {saving ? "Creando…" : "Crear tarea"}
+            {saving ? "Guardando…" : editing ? "Guardar cambios" : "Crear tarea"}
           </button>
         </div>
       </div>
