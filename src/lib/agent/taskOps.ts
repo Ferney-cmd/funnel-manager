@@ -145,6 +145,17 @@ export async function listTasks(
   return rows;
 }
 
+/* Cuántas tareas completó el usuario en un rango (para el resumen de la noche). */
+export async function countCompletedBetween(
+  sb: SupabaseClient, userId: string, startIso: string, endIso: string,
+): Promise<number> {
+  const { count } = await sb.from("node_tasks")
+    .select("id", { count: "exact", head: true })
+    .eq("assigned_to", userId).eq("done", true)
+    .gte("completed_at", startIso).lt("completed_at", endIso);
+  return count ?? 0;
+}
+
 export async function createTask(
   sb: SupabaseClient, userId: string,
   args: { titulo: string; fecha?: string | null; prioridad?: string; projectName?: string; moduleName?: string },

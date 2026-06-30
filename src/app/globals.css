@@ -4058,6 +4058,70 @@ body {
 }
 .mt-new-btn:hover { background: var(--brand-mid); }
 
+/* NotifyPrefs (recordatorios Telegram) */
+.np-wrap { position: relative; flex-shrink: 0; }
+.np-btn {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  transition: all .12s;
+  white-space: nowrap;
+}
+.np-btn:hover { border-color: var(--brand); color: var(--text); }
+.np-btn.active { color: var(--brand); border-color: var(--brand); }
+.np-pop {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 50;
+  width: 300px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0,0,0,.18);
+  padding: 16px;
+}
+.np-pop-title { font-size: 14px; font-weight: 700; color: var(--text); }
+.np-pop-sub { font-size: 12px; color: var(--text2); margin: 4px 0 12px; }
+.np-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+}
+.np-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: var(--brand); cursor: pointer; flex-shrink: 0; }
+.np-row-label { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); }
+.np-time {
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 5px 8px;
+}
+.np-time:disabled { opacity: .45; }
+.np-hint { font-size: 11px; color: var(--text2); margin: -2px 0 6px 26px; }
+.np-save {
+  width: 100%;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--brand);
+  border: none;
+  border-radius: 10px;
+  padding: 9px 0;
+  cursor: pointer;
+  transition: background .12s;
+}
+.np-save:hover { background: var(--brand-mid); }
+.np-save:disabled { opacity: .6; cursor: default; }
+
 /* QuickTaskModal */
 .qt-toggle { display: flex; gap: 8px; }
 .qt-toggle-btn {

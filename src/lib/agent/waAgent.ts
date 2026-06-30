@@ -140,3 +140,46 @@ export async function buildDailyText(sb: SupabaseClient, userId: string): Promis
   const r = await buildDailySummary(sb, userId);
   return r ? r.text : null;
 }
+
+/* Resumen de la MAÑANA: con cuántas tareas empiezas el día. Siempre devuelve algo. */
+export async function buildMorningSummary(
+  sb: SupabaseClient, userId: string,
+): Promise<{ text: string; tasks: ops.TaskRow[] }> {
+  const [venc, hoy] = await Promise.all([
+    ops.listTasks(sb, userId, { scope: "vencidas" }),
+    ops.listTasks(sb, userId, { scope: "hoy" }),
+  ]);
+  const { data: prof } = await sb.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+  const name = (prof?.full_name || "").split(" ")[0];
+  const total = venc.length + hoy.length;
+  let text = `☀️ Buenos días${name ? `, ${name}` : ""}. `;
+  if (total === 0) {
+    text += `Hoy no tienes tareas vencidas ni para hoy. 🎉`;
+    return { text, tasks: [] };
+  }
+  text += `Empiezas el día con ${total} tarea${total === 1 ? "" : "s"}:`;
+  if (venc.length) text += `\n\n⚠️ Vencidas (${venc.length})\n` + venc.slice(0, 8).map((t) => `• ${t.text}`).join("\n");
+  if (hoy.length)  text += `\n\n📅 Para hoy (${hoy.length})\n` + hoy.slice(0, 8).map((t) => `• ${t.text}`).join("\n");
+  text += `\n\nToca ✅ para completar o 📅 para posponer. ¡Buen día!`;
+  return { text, tasks: [...venc, ...hoy] };
+}
+
+/* Resumen de la NOCHE: cuántas completaste hoy y cuántas quedan. */
+export async function buildNightSummary(
+  sb: SupabaseClient, userId: string, dayStartIso: string, dayEndIso: string,
+): Promise<{ text: string; tasks: ops.TaskRow[] }> {
+  const [done, venc, hoy] = await Promise.all([
+    ops.countCompletedBetween(sb, userId, dayStartIso, dayEndIso),
+    ops.listTasks(sb, userId, { scope: "vencidas" }),
+    ops.listTasks(sb, userId, { scope: "hoy" }),
+  ]);
+  const { data: prof } = await sb.from("profiles").select("full_name").eq("id", userId).maybeSingle();
+  const name = (prof?.full_name || "").split(" ")[0];
+  let text = `🌙 Resumen del día${name ? `, ${name}` : ""}.`;
+  text += `\n\n✅ Completaste ${done} tarea${done === 1 ? "" : "s"} hoy.`;
+  if (hoy.length) text += `\n📌 Te quedan ${hoy.length} para hoy.`;
+  if (venc.length) text += `\n⚠️ ${venc.length} vencida${venc.length === 1 ? "" : "s"} sin cerrar.`;
+  if (!hoy.length && !venc.length) text += `\n🎉 ¡Sin pendientes! Cierra el día tranquilo.`;
+  if (hoy.length || venc.length) text += `\n\nToca ✅ para cerrar lo que falte o escríbeme.`;
+  return { text, tasks: [...venc, ...hoy] };
+}

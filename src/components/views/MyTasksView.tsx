@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PRIORITY_COLORS } from "@/lib/constants";
 import { getInitials, type Profile } from "@/lib/profiles";
 import { QuickTaskModal, INBOX_NAME, type EditTask } from "./QuickTaskModal";
+import { NotifyPrefs } from "./NotifyPrefs";
 
 interface MyTasksViewProps {
   me: Profile | null;
@@ -346,6 +347,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
               onChange={(e) => setQuery(e.target.value)}
             />
           </div>
+          {me?.id && <NotifyPrefs userId={me.id} />}
           <button className="mt-new-btn" onClick={() => setQuickOpen(true)}>
             + Nueva tarea
           </button>
