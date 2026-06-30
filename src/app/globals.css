@@ -2623,6 +2623,9 @@ body {
 .wizard-member-row {
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
+  align-items: stretch;
+  background: transparent;
   border: 1.5px solid var(--border);
   border-radius: 9px;
   overflow: hidden;
