@@ -3962,10 +3962,26 @@ body {
   border-color: var(--brand);
 }
 .mt-pending-count {
-  margin-left: auto;
   font-size: 11.5px;
   font-weight: 600;
   color: var(--text3);
+}
+.mt-collapse-all {
+  margin-left: auto;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+}
+.mt-collapse-all:hover { text-decoration: underline; }
+.mt-sec-chevron {
+  display: inline-block;
+  width: 12px;
+  color: var(--text3);
+  font-size: 10px;
 }
 
 .mt-list { display: flex; flex-direction: column; padding-bottom: 24px; }
@@ -4057,6 +4073,64 @@ body {
   white-space: nowrap;
 }
 .mt-new-btn:hover { background: var(--brand-mid); }
+.mt-tpl-btn {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brand);
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color .12s, background .12s;
+}
+.mt-tpl-btn:hover { border-color: var(--brand); background: var(--brand-light); }
+[data-theme="dark"] .mt-tpl-btn:hover { background: rgba(124,58,237,0.18); }
+
+/* Modal de plantillas */
+.tpl-tabs { display: flex; gap: 4px; padding: 12px 22px 0; }
+.tpl-tab {
+  font-size: 13px; font-weight: 600; color: var(--text2);
+  background: transparent; border: none; border-bottom: 2px solid transparent;
+  padding: 8px 12px; cursor: pointer;
+}
+.tpl-tab:hover { color: var(--text); }
+.tpl-tab.active { color: var(--brand); border-bottom-color: var(--brand); }
+.tpl-list { display: flex; flex-direction: column; gap: 6px; }
+.tpl-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; background: var(--surface2);
+  border: 1px solid var(--border); border-radius: 9px;
+}
+.tpl-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.tpl-row-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.tpl-row-meta { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text3); }
+.tpl-badge { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+.tpl-badge.shared { color: #10B981; background: rgba(16,185,129,0.15); }
+.tpl-badge.personal { color: var(--text2); background: var(--surface3, var(--surface)); border: 1px solid var(--border); }
+.tpl-apply-btn {
+  flex-shrink: 0; font-size: 12.5px; font-weight: 600; color: #fff;
+  background: var(--brand); border: none; border-radius: 8px; padding: 6px 14px; cursor: pointer;
+}
+.tpl-apply-btn:hover:not(:disabled) { background: var(--brand-mid); }
+.tpl-apply-btn:disabled { opacity: .5; cursor: not-allowed; }
+.tpl-del-btn, .tpl-item-del {
+  flex-shrink: 0; background: transparent; border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 10px; cursor: pointer; color: #E24B4A;
+}
+.tpl-del-btn:hover, .tpl-item-del:hover:not(:disabled) { border-color: #E24B4A; }
+.tpl-item-del:disabled { opacity: .35; cursor: not-allowed; }
+.tpl-import-btn, .tpl-additem-btn {
+  margin-top: 8px; font-size: 12.5px; font-weight: 600; color: var(--brand);
+  background: transparent; border: 1px dashed var(--border2, var(--border)); border-radius: 8px;
+  padding: 7px 12px; cursor: pointer; width: 100%;
+}
+.tpl-import-btn:hover:not(:disabled), .tpl-additem-btn:hover { border-color: var(--brand); }
+.tpl-import-btn:disabled { opacity: .5; cursor: not-allowed; }
+.tpl-item-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+.tpl-item-prio { max-width: 110px; flex-shrink: 0; }
 
 /* NotifyPrefs (recordatorios Telegram) */
 .np-wrap { position: relative; flex-shrink: 0; }

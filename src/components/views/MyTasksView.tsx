@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { PRIORITY_COLORS } from "@/lib/constants";
 import { getInitials, type Profile } from "@/lib/profiles";
 import { QuickTaskModal, INBOX_NAME, type EditTask } from "./QuickTaskModal";
+import { TemplatesModal } from "./TemplatesModal";
 import { NotifyPrefs } from "./NotifyPrefs";
 
 interface MyTasksViewProps {
@@ -26,6 +27,7 @@ interface MyTask {
   nodeTitle: string;
   nodeIcon: string;
   projectName: string;
+  createdAt: string;
 }
 
 const OVERDUE_COLOR = "#E24B4A";
@@ -111,11 +113,28 @@ const FILTERS: { key: FilterKey; label: string }[] = [
 export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksViewProps) {
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
-  const [completedOpen, setCompletedOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [quickOpen, setQuickOpen] = useState(false);
   const [editTask, setEditTask] = useState<MyTask | null>(null);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+
+  // Colapso de secciones (cerradas por defecto salvo Atrasadas/Hoy), recordado por usuario
+  const COLLAPSE_KEY = "fm_mt_collapsed";
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
+    if (typeof window !== "undefined") {
+      try { const s = localStorage.getItem(COLLAPSE_KEY); if (s) return JSON.parse(s); } catch { /* noop */ }
+    }
+    return { week: true, upcoming: true, nodate: true, completed: true };
+  });
+  useEffect(() => {
+    try { localStorage.setItem(COLLAPSE_KEY, JSON.stringify(collapsed)); } catch { /* noop */ }
+  }, [collapsed]);
+  const toggleSection = (k: string) => setCollapsed((p) => ({ ...p, [k]: !p[k] }));
+  const setAllCollapsed = (v: boolean) =>
+    setCollapsed({ overdue: v, today: v, week: v, upcoming: v, nodate: v, completed: v });
+  const allKeys = [...SECTION_ORDER.map((s) => s.key), "completed"];
+  const allCollapsed = allKeys.every((k) => collapsed[k]);
 
   const loadTasks = useCallback(async () => {
     const meId = me?.id;
@@ -129,7 +148,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
     const { data } = await supabase
       .from("node_tasks")
       .select(
-        "id, text, done, due_date, priority, node_id, project_id, funnel_nodes(title, icon), projects(name)"
+        "id, text, done, due_date, priority, node_id, project_id, created_at, funnel_nodes(title, icon), projects(name)"
       )
       .eq("assigned_to", meId)
       .order("due_date", { ascending: true });
@@ -148,6 +167,7 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
         nodeTitle: node?.title ?? "",
         nodeIcon: node?.icon ?? "📦",
         projectName: proj?.name ?? "",
+        createdAt: r.created_at ?? "",
       };
     });
     setTasks(mapped);
@@ -215,6 +235,10 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
       nodate: [],
     };
     for (const t of pending) grouped[classifyTask(t, today, weekEnd)].push(t);
+    // Nuevas primero (estilo Asana): dentro de cada grupo, las creadas más recientemente arriba
+    const newestFirst = (a: MyTask, b: MyTask) => (b.createdAt || "").localeCompare(a.createdAt || "");
+    for (const k of Object.keys(grouped) as SectionKey[]) grouped[k].sort(newestFirst);
+    done.sort(newestFirst);
 
     // Stats sobre TODO (no afectadas por filtro/búsqueda)
     const overdueN = pendingAll.filter((t) => classifyTask(t, today, weekEnd) === "overdue").length;
@@ -348,6 +372,9 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
             />
           </div>
           {me?.id && <NotifyPrefs userId={me.id} />}
+          <button className="mt-tpl-btn" onClick={() => setTemplatesOpen(true)} title="Plantillas de tareas">
+            ⛭ Plantillas
+          </button>
           <button className="mt-new-btn" onClick={() => setQuickOpen(true)}>
             + Nueva tarea
           </button>
@@ -382,7 +409,14 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
             {f.label}
           </button>
         ))}
-        {hasAny && <span className="mt-pending-count">{pendingCount} pendientes</span>}
+        {hasAny && (
+          <>
+            <button className="mt-collapse-all" onClick={() => setAllCollapsed(!allCollapsed)}>
+              {allCollapsed ? "▸ Expandir todo" : "▾ Colapsar todo"}
+            </button>
+            <span className="mt-pending-count">{pendingCount} pendientes</span>
+          </>
+        )}
       </div>
 
       {!hasAny ? (
@@ -394,13 +428,18 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
           {SECTION_ORDER.map(({ key, label, reddish }) => {
             const items = sections[key];
             if (!items.length) return null;
+            const isCollapsed = !!collapsed[key];
             return (
               <div key={key} className="mt-section">
-                <div className="mt-section-header">
+                <button
+                  className="mt-section-header mt-section-toggle"
+                  onClick={() => toggleSection(key)}
+                >
+                  <span className="mt-sec-chevron">{isCollapsed ? "▸" : "▾"}</span>
                   <span style={reddish ? { color: OVERDUE_COLOR } : undefined}>{label}</span>
                   <span className="mt-section-count">{items.length}</span>
-                </div>
-                {items.map((t) => renderCard(t, reddish))}
+                </button>
+                {!isCollapsed && items.map((t) => renderCard(t, reddish))}
               </div>
             );
           })}
@@ -409,12 +448,13 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
             <div className="mt-section">
               <button
                 className="mt-section-header mt-section-toggle"
-                onClick={() => setCompletedOpen((o) => !o)}
+                onClick={() => toggleSection("completed")}
               >
-                <span>{completedOpen ? "▾" : "▸"} Completadas</span>
+                <span className="mt-sec-chevron">{collapsed["completed"] ? "▸" : "▾"}</span>
+                <span>Completadas</span>
                 <span className="mt-section-count">{completed.length}</span>
               </button>
-              {completedOpen && completed.map((t) => renderCard(t))}
+              {!collapsed["completed"] && completed.map((t) => renderCard(t))}
             </div>
           )}
         </div>
@@ -442,6 +482,14 @@ export function MyTasksView({ me, onOpenTaskProject, onSelectView }: MyTasksView
           } as EditTask}
           onClose={() => setEditTask(null)}
           onSaved={loadTasks}
+        />
+      )}
+
+      {templatesOpen && me && (
+        <TemplatesModal
+          me={me}
+          onClose={() => setTemplatesOpen(false)}
+          onApplied={loadTasks}
         />
       )}
     </div>
